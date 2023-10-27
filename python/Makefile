@@ -15,5 +15,5 @@ setup_py:
 	$(PIPPATH) install -r requirements.txt
 
 
-test_orig: setup_py
-	$(PYTHONPATH) tsc/softmax.py
+test: setup_py
+	$(PYTHONPATH) test.py
