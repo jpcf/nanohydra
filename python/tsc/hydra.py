@@ -11,9 +11,10 @@ def conv1d(x, w, dilation):
     _Y = np.empty((num_examples, H, K, int(xlen/(dilation+1))))
 
     for ex in range(num_examples):
+        # Calculate the current dilation for the given example
+        x_dil = np.take(x[ex,:], [(1+dilation)*i for i in range(int(xlen/(dilation+1)))], mode='wrap')
         for h in range(H):
             for k in range(K):
-                x_dil = np.take(x[ex,:], [(1+dilation)*i for i in range(int(xlen/(dilation+1)))], mode='wrap')
                 _Y[ex, h, k] = np.convolve(x_dil, w[h,k], mode='same')
 
     return _Y
