@@ -1,23 +1,5 @@
 import numpy as np
-
-def conv1d(x, w, dilation):
-    assert len(x.shape) == 2, f"X array must be dimension 2D, but has {len(x.shape)} dimensions"
-    
-    num_examples = x.shape[0]
-    xlen = x.shape[1]
-    H = w.shape[0]
-    K = w.shape[1]
-
-    _Y = np.empty((num_examples, H, K, int(xlen/(dilation+1))))
-
-    for ex in range(num_examples):
-        # Calculate the current dilation for the given example
-        x_dil = np.take(x[ex,:], [(1+dilation)*i for i in range(int(xlen/(dilation+1)))], mode='wrap')
-        for h in range(H):
-            for k in range(K):
-                _Y[ex, h, k] = np.convolve(x_dil, w[h,k], mode='same')
-
-    return _Y
+from .hydra_opt_fn import conv1d_opt
 
 def hard_counting(max_idxs, kernels_per_group):
 
@@ -51,7 +33,7 @@ class Hydra():
 
         max_exponent = np.log2((input_length - 1) / (self.__KERNEL_LEN - 1))
 
-        self.dilations = 2 ** np.arange(int(max_exponent))
+        self.dilations = np.array(2 ** np.arange(int(max_exponent)), dtype=np.int32)
         self.dilations = np.insert(self.dilations, 0, 0)
         print(self.dilations)
         self.num_dilations = len(self.dilations)
@@ -61,7 +43,7 @@ class Hydra():
         self.divisor = min(2, self.g)
         self.h = self.g // self.divisor
 
-        self.W = rng.standard_normal(size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN))
+        self.W = rng.standard_normal(size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN)).astype(np.float32)
         self.W = self.W - np.mean(self.W)
         self.W = self.W / np.sum(np.abs(self.W))
 
@@ -89,7 +71,6 @@ class Hydra():
         for dilation_index in range(self.num_dilations):
 
             d = self.dilations[dilation_index]
-            p = self.paddings[dilation_index]
 
             feats = [None for i in range(self.divisor)]
 
@@ -97,8 +78,11 @@ class Hydra():
 
                 print(f"Transforming {num_examples} input samples for dilation {d} and diff_idx {diff_index}")
 
-                # Perform convolution on all kernels of a given
-                _Z = conv1d(X if diff_index == 0 else diff_X, self.W[dilation_index, diff_index], dilation = d)
+
+                _X = X if diff_index == 0 else diff_X
+                # Perform convolution on all kernels of a given dilation
+                print(f"Current Dilation: {d}")
+                _Z = conv1d_opt(_X, self.W[dilation_index, diff_index], dilation = d)
 
                 # For each example, calculate the (arg)max/min over the k kernels of a given group.
                 # Here we should "collapse" the second dimension of the tensor, where the kernel indices are.
@@ -124,6 +108,7 @@ class Hydra():
                 Z = feats
 
         return Z 
+
 
 class SparseScaler():
 
