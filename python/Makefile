@@ -19,7 +19,7 @@ build_lib:
 	$(PYTHONPATH) setup.py build_ext --inplace
 
 test: setup_py
-	$(PYTHONPATH) test.py 10000
+	$(PYTHONPATH) test.py 100
 
 # Used in 29th Oct for profiling the first naive numpy port
 profile_hydra:

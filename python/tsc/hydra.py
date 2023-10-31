@@ -1,5 +1,6 @@
 import numpy as np
-from .hydra_opt_fn import conv1d_opt
+from .conv1d_opt import conv1d_opt
+from .hard_counting_opt import hard_counting_opt
 
 def hard_counting(max_idxs, kernels_per_group):
 
@@ -35,7 +36,6 @@ class Hydra():
 
         self.dilations = np.array(2 ** np.arange(int(max_exponent)), dtype=np.int32)
         self.dilations = np.insert(self.dilations, 0, 0)
-        print(self.dilations)
         self.num_dilations = len(self.dilations)
 
         self.paddings = np.round(np.divide((9 - 1) * self.dilations, 2)).astype(np.uint32)
@@ -87,13 +87,13 @@ class Hydra():
                 # For each example, calculate the (arg)max/min over the k kernels of a given group.
                 # Here we should "collapse" the second dimension of the tensor, where the kernel indices are.
                 # Both return vectors should have dimensions (num_examples, num_groups, input_len)
-                max_values, max_indices = np.max(_Z, axis=2), np.argmax(_Z, axis=2)
-                min_values, min_indices = np.min(_Z, axis=2), np.argmin(_Z, axis=2)
+                max_values, max_indices = np.max(_Z, axis=2).astype(np.int32), np.argmax(_Z, axis=2).astype(np.uint32)
+                min_values, min_indices = np.min(_Z, axis=2).astype(np.int32), np.argmin(_Z, axis=2).astype(np.uint32)
                 
                 # Create a feature vector of size (num_groups, num_kernels) where each of the num_kernels position contains
                 # the count for the respective kernel with that index.
-                feats_hard_max = hard_counting(max_indices, kernels_per_group=self.k)
-                feats_hard_min = hard_counting(min_indices, kernels_per_group=self.k)
+                feats_hard_max = hard_counting_opt(max_indices, kernels_per_group=self.k)
+                feats_hard_min = hard_counting_opt(min_indices, kernels_per_group=self.k)
 
                 feats_hard_max = feats_hard_max.reshape((num_examples, self.h*self.k))
                 feats_hard_min = feats_hard_min.reshape((num_examples, self.h*self.k))
