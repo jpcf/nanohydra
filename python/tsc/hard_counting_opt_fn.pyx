@@ -20,10 +20,11 @@ def hard_counting_opt(cnp.ndarray[DTYPE_UINT32_t, ndim=3] max_idxs, unsigned int
 
     cdef cnp.ndarray[DTYPE_UINT32_t, ndim=3] feats = np.zeros([num_examples, num_groups, kernels_per_group], dtype=DTYPE_UINT32)
 
-    for ex in range(num_examples):
-        for gr in range(num_groups):
-            for s in range(num_samples):
-                idx = max_idxs[ex,gr,s]
-                feats[ex,gr,idx] += 1
+    with nogil:
+        for ex in prange(num_examples, schedule='static', num_threads=16):
+            for gr in range(num_groups):
+                for s in range(num_samples):
+                    idx = max_idxs[ex,gr,s]
+                    feats[ex,gr,idx] += 1
     
     return feats
