@@ -1,34 +1,18 @@
 import numpy as np
-from .conv1d_opt import conv1d_opt
-from .hard_counting_opt import hard_counting_opt
-from .soft_counting_opt import soft_counting_opt
+from .optimized_fns.conv1d_opt import conv1d_opt
+from .optimized_fns.hard_counting_opt import hard_counting_opt
+from .optimized_fns.soft_counting_opt import soft_counting_opt
 
-def hard_counting(max_idxs, kernels_per_group):
-
-    num_examples, num_groups = max_idxs.shape[0], max_idxs.shape[1]
-
-    feats = np.zeros((num_examples, num_groups, kernels_per_group))
-    for ex in range(num_examples):
-        for gr in range(num_groups):
-            idxs,cnts = np.unique(max_idxs[ex,gr], return_counts=True)
-            for idx,cnt in zip(idxs,cnts):
-                feats[ex,gr,idx] = cnt
-
-    return feats
 
 class Hydra():
 
     __KERNEL_LEN = 9
 
-    def __init__(self, input_length, k = 8, g = 64, seed = None):
+    def __init__(self, input_length, k = 8, g = 64, seed = None, dist = "normal"):
 
         super().__init__()
 
-        if seed is not None:
-            # TODO: set numpy random num gen seed
-            pass
-
-        rng = np.random.default_rng()
+        rng = np.random.default_rng(seed=seed)
 
         self.k = k # num kernels per group
         self.g = g # num groups
@@ -44,9 +28,13 @@ class Hydra():
         self.divisor = min(2, self.g)
         self.h = self.g // self.divisor
 
-        self.W = rng.standard_normal(size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN)).astype(np.float32)
-        self.W = self.W - np.mean(self.W)
-        self.W = self.W / np.sum(np.abs(self.W))
+        if(dist == "normal"):
+            self.W = rng.standard_normal(size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN)).astype(np.float32)
+            self.W = self.W - np.mean(self.W)
+            self.W = self.W / np.sum(np.abs(self.W))
+        elif(dist == "binomial"):
+            self.W = rng.choice([-1, 1], size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN), p=[0.5, 0.5]).astype(np.float32)
+
 
     # transform in batches of *batch_size*
     def batch(self, X, batch_size = 256):
@@ -77,12 +65,11 @@ class Hydra():
 
             for diff_index in range(self.divisor):
 
-                print(f"Transforming {num_examples} input samples for dilation {d} and diff_idx {diff_index}")
-
+                #print(f"Transforming {num_examples} input samples for dilation {d} and diff_idx {diff_index}")
 
                 _X = X if diff_index == 0 else diff_X
                 # Perform convolution on all kernels of a given dilation
-                print(f"Current Dilation: {d}")
+                #print(f"Current Dilation: {d}")
                 _Z = conv1d_opt(_X, self.W[dilation_index, diff_index], dilation = d)
 
                 # For each example, calculate the (arg)max/min over the k kernels of a given group.
