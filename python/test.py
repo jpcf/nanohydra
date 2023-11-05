@@ -1,11 +1,11 @@
 from sktime.datasets                     import load_UCR_UEA_dataset as load_ucr_ds
 from sktime.transformations.panel.rocket import MiniRocket
-from sklearn.linear_model                 import RidgeClassifierCV
-from sklearn.preprocessing                 import StandardScaler
+from sklearn.linear_model                import RidgeClassifierCV, Perceptron
+from sklearn.preprocessing               import StandardScaler
 import numpy as np
 import sys
 import time
-from tsc.hydra import Hydra, SparseScaler
+from nanohydra.hydra import Hydra, SparseScaler
 
 DATASETS = ["ECG5000"]
 
@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
         # Initialize the kernel transformer, scaler and classifier
         cl = RidgeClassifierCV(alphas=np.logspace(-3,3,10))
-        model  = Hydra(input_length=input_length)    
+        model  = Hydra(input_length=input_length, dist="binomial")    
         scaler = SparseScaler()
 
         # Transform and scale

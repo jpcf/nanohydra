@@ -4,3 +4,5 @@ torch==2.1.0
 sktime==0.24.0
 line-profiler==4.1.1
 Cython==3.0.4
+matplotlib==3.8.1
+PyQt5==5.15.10

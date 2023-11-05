@@ -16,10 +16,16 @@ setup_py:
 	$(PIPPATH) install -r requirements.txt
 
 build_lib:
-	$(PYTHONPATH) setup.py build_ext --inplace
+	$(PYTHONPATH) ./nanohydra/setup.py build_ext --build-lib=./nanohydra/optimized_fns
 
 test: setup_py
-	$(PYTHONPATH) test.py 100
+	$(PYTHONPATH) test.py 10000
+
+run_ucr_benchmark: setup_py
+	$(PYTHONPATH) run_ucr_benchmark.py all
+
+analyze_ucr_benchmark: setup_py
+	$(PYTHONPATH) scripts/ucr_compare.py
 
 # Used in 29th Oct for profiling the first naive numpy port
 profile_hydra:
