@@ -18,13 +18,13 @@ setup_py:
 build_lib:
 	$(PYTHONPATH) ./nanohydra/setup.py build_ext --build-lib=./nanohydra/optimized_fns
 
-test: setup_py
+test: 
 	$(PYTHONPATH) test.py 10000
 
-run_ucr_benchmark: setup_py
+run_ucr_benchmark: 
 	$(PYTHONPATH) run_ucr_benchmark.py all
 
-analyze_ucr_benchmark: setup_py
+analyze_ucr_benchmark: 
 	$(PYTHONPATH) scripts/ucr_compare.py
 
 # Used in 29th Oct for profiling the first naive numpy port

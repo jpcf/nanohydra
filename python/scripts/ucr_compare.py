@@ -2,8 +2,13 @@ import pandas as pd
 import numpy  as np
 from scipy.stats import wilcoxon
 import matplotlib.pyplot as plt
+from sktime.datasets                     import load_UCR_UEA_dataset as load_ucr_ds
+import warnings
+import os
+import pickle
 
 CSV_PATH = "./data/results_ours_k8_g8.csv"
+UCR_DATA_SET_FACTS = "./data/ucr_props.bin"
 
 if __name__ == "__main__":
 
@@ -29,4 +34,89 @@ if __name__ == "__main__":
     plt.xlabel("Percent point difference")
     plt.ylabel("# Datasets")
     ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=14, verticalalignment='top', bbox=props)
+    plt.savefig("./data/fig1_histogram_dev.png", dpi=200, bbox_inches='tight')
+
+    # Write back results to another CSV. x
+    csv_out = pd.DataFrame(csv['dataset'])
+    csv_out['Hydra'] = csv['Hydra']
+    csv_out['Hydra_Binomial'] = csv['Hydra_Binomial']
+    csv_out['Differences'] = diffs
+
+    # Print out the worse ones
+    csv_out.sort_values(by='Differences', ascending=True, inplace=True)
+    print(f"****** The 15 worse-performing datasets are:\n{csv_out['dataset'][0:15]}\n")
+    
+    # Print out the best ones
+    csv_out.sort_values(by='Differences', ascending=False, inplace=True)
+    print(f"****** The 15 best-performing datasets are:\n{csv_out['dataset'][0:15]}\n")
+
+    # Append other relevant information
+    csv_out['Input Length']     = np.nan
+    csv_out['Training Samples'] = np.nan
+
+    if(not os.path.exists("./data/ucr_props.bin")):
+        props = {}
+        print("First execution. It might take some time...")
+
+        for idx,row in csv_out.iterrows():
+            X,_ = load_ucr_ds(row['dataset'], split="test", return_type="numpy2d")
+            input_len = X.shape[1]
+            numex_len = X.shape[0]
+            with warnings.catch_warnings():
+                warnings.simplefilter(action='ignore')
+                csv_out['Input Length'][idx]     = input_len 
+                csv_out['Training Samples'][idx] = numex_len
+            props[row['dataset']] = {'input_len': input_len, 'numex_len': numex_len}
+
+        with open(UCR_DATA_SET_FACTS, "wb") as f:
+            pickle.dump(props, f)
+    else:
+        print("Using precomputed values...")
+        with open(UCR_DATA_SET_FACTS, "rb") as f:
+            props = pickle.load(f)
+            for idx,row in csv_out.iterrows():
+                with warnings.catch_warnings():
+                    warnings.simplefilter(action='ignore')
+                    csv_out['Input Length'][idx]     = props[row['dataset']]['input_len']
+                    csv_out['Training Samples'][idx] = props[row['dataset']]['numex_len']
+
+    print(csv_out)
+
+    # Scatter plot of accuracy difference vs input length
+    plt.figure(2)
+    plt.title("nanoHydra Differences vs Input Length")
+    plt.scatter(csv_out['Differences'], csv_out['Input Length'])
+    plt.xlabel("Accuracy Deviation of nanoHydra")
+    plt.ylabel("Input Sequence Length (in samples)")
+    plt.ylabel("# Datasets")
+    plt.grid(True)
+    plt.savefig("./data/fig2_dev_vs_input_len.png", dpi=200,  bbox_inches='tight')
+    
+    # Scatter plot of accuracy difference vs training set size
+    plt.figure(3)
+    plt.title("nanoHydra Differences vs Training Samples")
+    plt.scatter(csv_out['Differences'], csv_out['Training Samples'])
+    plt.xlabel("Accuracy Deviation of nanoHydra")
+    plt.ylabel("Training Set Size (in number of training sequence examples)")
+    plt.grid(True)
+    plt.savefig("./data/fig3_dev_vs_training_sz.png", dpi=200,  bbox_inches='tight')
+
+    # Scatter plot of accuracy difference vs original accuracy
+    plt.figure(4)
+    plt.title("nanoHydra Differences vs Original Accuracy")
+    plt.scatter(csv_out['Differences'], 100*csv_out['Hydra'])
+    plt.xlabel("Accuracy Deviation of nanoHydra")
+    plt.ylabel("Accuracy of original Hydra Model")
+    plt.grid(True)
+    plt.savefig("./data/fig4_dev_vs_orig_acc.png",  dpi=200, bbox_inches='tight')
+
+    # Save to CSV
+    csv_out.to_csv("./data/results_vs_data_props.csv")
+
     plt.show()
+
+    
+
+
+
+
