@@ -30,3 +30,6 @@ analyze_ucr_benchmark:
 # Used in 29th Oct for profiling the first naive numpy port
 profile_hydra:
 	$(PYTHONPATH)  profile_hydra.py
+
+download_speech_commands:
+	$(PYTHONPATH)  scripts/download_sc.py

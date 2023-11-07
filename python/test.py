@@ -1,6 +1,6 @@
 from sktime.datasets                     import load_UCR_UEA_dataset as load_ucr_ds
 from sktime.transformations.panel.rocket import MiniRocket
-from sklearn.linear_model                import RidgeClassifierCV, Perceptron
+from sklearn.linear_model                import RidgeClassifierCV, SGDClassifier
 from sklearn.preprocessing               import StandardScaler
 import numpy as np
 import sys
@@ -40,12 +40,14 @@ if __name__ == "__main__":
         input_length = Xtrain.shape[1]
 
         # Initialize the kernel transformer, scaler and classifier
-        cl = RidgeClassifierCV(alphas=np.logspace(-3,3,10))
-        model  = Hydra(input_length=input_length, dist="binomial")    
+        #cl = RidgeClassifierCV(alphas=np.logspace(-3,3,10))
+        cl = SGDClassifier(loss='log_loss', alpha=0.01, n_jobs=8)
+        model  = Hydra(input_length=input_length, k=8, g=8,dist="binomial")    
         scaler = SparseScaler()
 
         # Transform and scale
         print(f"Transforming {Xtrain.shape[0]} training examples...")
+        #Xt  = model.forward_batch(Xtrain, 512)
         Xt  = model.forward(Xtrain)
         print(f"Transform size: {Xt.shape}")
         Xts = scaler.fit_transform(Xt) 

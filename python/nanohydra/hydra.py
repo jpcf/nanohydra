@@ -37,15 +37,15 @@ class Hydra():
 
 
     # transform in batches of *batch_size*
-    def batch(self, X, batch_size = 256):
+    def forward_batch(self, X, batch_size = 256):
         num_examples = X.shape[0]
         if num_examples <= batch_size:
             return self.forward(X)
         else:
             Z = []
-            batches = np.arange(num_examples).split(batch_size)
-            for batch in batches:
-                Z.append(self.forward(X[batch]))
+            for idx in range(0, num_examples, batch_size):
+                print(f"Range: {idx}:{min(idx+batch_size, num_examples)}")
+                Z.append(self.forward(X[idx:min(idx+batch_size, num_examples)]))
             return np.vstack(Z)
 
     def forward(self, X):
