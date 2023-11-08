@@ -1,13 +1,11 @@
 from sktime.datasets                     import load_UCR_UEA_dataset as load_ucr_ds
-from sktime.transformations.panel.rocket import MiniRocket
-from sklearn.linear_model                import RidgeClassifierCV, SGDClassifier
-from sklearn.preprocessing               import StandardScaler
 import numpy as np
 import sys
 import time
-from nanohydra.hydra import Hydra, SparseScaler
+from nanohydra.hydra import NanoHydra
 
-DATASETS = ["ECG5000"]
+DATASETS    = ["FiftyWords"]
+BATCH_TRAIN = True
 
 X  = {'test': {}, 'train': {}}
 y  = {'test': {}, 'train': {}}
@@ -33,38 +31,37 @@ if __name__ == "__main__":
         Xtest  = X['train'][ds][:Ns,:].astype(np.float32)
         Ytrain = y['test'][ds][:Ns].astype(np.float32)
         Ytest  = y['train'][ds][:Ns].astype(np.float32)
-        print(Xtrain)
+        print(np.unique(Ytrain))
         print(f"Training fold: {Xtrain.shape}")
         print(f"Testing  fold: {Xtest.shape}")
 
         input_length = Xtrain.shape[1]
 
         # Initialize the kernel transformer, scaler and classifier
-        #cl = RidgeClassifierCV(alphas=np.logspace(-3,3,10))
-        cl = SGDClassifier(loss='log_loss', alpha=0.01, n_jobs=8)
-        model  = Hydra(input_length=input_length, k=8, g=8,dist="binomial")    
-        scaler = SparseScaler()
+        model  = NanoHydra(input_length=input_length, k=64, g=32, dist="binomial", classifier="Logistic", scaler="Sparse")    
 
         # Transform and scale
         print(f"Transforming {Xtrain.shape[0]} training examples...")
-        #Xt  = model.forward_batch(Xtrain, 512)
-        Xt  = model.forward(Xtrain)
-        print(f"Transform size: {Xt.shape}")
-        Xts = scaler.fit_transform(Xt) 
-        print(f"Scaled-Transform size: {Xt.shape}")
+        if(not BATCH_TRAIN):
+            Xt  = model.forward(Xtrain)
+            print(f"Transform size: {Xt.shape}")
+            model.fit_scaler(Xt)
+            Xts = model.forward_scaler(Xt)
+            print(f"Scaled-Transform size: {Xts.shape}")
 
-        # Fit the transformed features
-        cl.fit(Xts, Ytrain)
-        print(f"Fitting the classifier")
+            # Fit the transformed features
+            model.fit_classifier(Xts, Ytrain)
+            print(f"Fitting the classifier")
+        else:
+            Xt  = model.forward_batch(Xtrain, 100, do_fit=False)
+            model.fit_classifier(Xt, Ytrain)
 
         # Test the classifier
         print(f"Transforming Test Fold...")
         Xr = model.forward(Xtest)
-        scaler = SparseScaler()
-        print(f"Scaling Test Fold...")
-        Xr = scaler.fit_transform(Xr)
-        print(f"Scoring Test Fold...")
-        score = cl.score(Xr, Ytest)
+        model.fit_scaler(Xr)
+        Xr = model.forward_scaler(Xr)
+        score = model.score(Xr, Ytest)
         print(f"Score for '{ds}': {100*score:0.02f} %") 	
 
     print(f"Execution of {Ns} examples took {time.perf_counter()-start} seconds")

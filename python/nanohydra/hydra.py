@@ -1,25 +1,52 @@
 import numpy as np
+from sklearn.linear_model                import RidgeClassifierCV, SGDClassifier
 from .optimized_fns.conv1d_opt import conv1d_opt
 from .optimized_fns.hard_counting_opt import hard_counting_opt
 from .optimized_fns.soft_counting_opt import soft_counting_opt
 
+class NanoHydraCfg():
+    def __init__(self, seed, scalertype, classifiertype, classifier_args=None):
+        # Define scaler
+        if(scalertype.lower() == "sparse"):
+            self.scaler = SparseScaler()
+        else:
+            print("Unknown Scaler specified")
 
-class Hydra():
+        # Define Classifier
+        if(classifiertype.lower() == "logistic"):
+            self.classf = SGDClassifier(loss='log_loss', alpha=0.01, n_jobs=16)
+        elif(classifiertype.lower() == "ridge"):
+            self.classf = RidgeClassifierCV(alphas=np.logspace(-3,3,10))
+        else:
+            print("Unknown classifier type")
+
+        self.seed = seed
+
+    def get_scaler(self):
+        return self.scaler
+
+    def get_classf(self):
+        return self.classf
+
+    def get_seed(self):
+        return self.seed
+
+class NanoHydra():
 
     __KERNEL_LEN = 9
 
-    def __init__(self, input_length, k = 8, g = 64, seed = None, dist = "normal"):
+    def __init__(self, input_length, k = 8, g = 64, max_dilations=8, seed = None, dist = "normal", classifier="Logistic", scaler="Sparse"):
 
-        super().__init__()
+        self.cfg = NanoHydraCfg(seed= seed, scalertype=scaler, classifiertype=classifier)
 
-        rng = np.random.default_rng(seed=seed)
+        rng = np.random.default_rng(seed=self.cfg.get_seed())
 
         self.k = k # num kernels per group
         self.g = g # num groups
 
         max_exponent = np.log2((input_length - 1) / (self.__KERNEL_LEN - 1))
 
-        self.dilations = np.array(2 ** np.arange(int(max_exponent)), dtype=np.int32)
+        self.dilations = np.array(2 ** np.arange(int(max_exponent)), dtype=np.int32)[:max_dilations]
         self.dilations = np.insert(self.dilations, 0, 0)
         self.num_dilations = len(self.dilations)
 
@@ -35,9 +62,19 @@ class Hydra():
         elif(dist == "binomial"):
             self.W = rng.choice([-1, 1], size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN), p=[0.5, 0.5]).astype(np.float32)
 
+    def fit_scaler(self, X, num_samples=None):
+        if(num_samples is not None):
+            Xs = X.take(np.random.choice(X.shape[0], num_samples), axis=0).astype(np.float32)
+            Xs = self.forward(Xs)
+        else:
+            Xs = X
+        self.cfg.get_scaler().fit(Xs)
+
+    def forward_scaler(self, X):
+        return self.cfg.get_scaler().transform(X)
 
     # transform in batches of *batch_size*
-    def forward_batch(self, X, batch_size = 256):
+    def forward_batch(self, X, batch_size = 256, do_fit=True, Y=None):
         num_examples = X.shape[0]
         if num_examples <= batch_size:
             return self.forward(X)
@@ -45,8 +82,20 @@ class Hydra():
             Z = []
             for idx in range(0, num_examples, batch_size):
                 print(f"Range: {idx}:{min(idx+batch_size, num_examples)}")
-                Z.append(self.forward(X[idx:min(idx+batch_size, num_examples)]))
-            return np.vstack(Z)
+                Zt = self.forward(X[idx:min(idx+batch_size, num_examples)])
+                self.fit_scaler(Zt)
+                Zs = self.forward_scaler(Zt)
+
+                if(do_fit):
+                    if(idx==0):
+                        self.cfg.get_classf().partial_fit(Zs, Y[idx:min(idx+batch_size, num_examples), :], np.unique(Y))
+                    else:
+                        self.cfg.get_classf().partial_fit(Zs, Y[idx:min(idx+batch_size, num_examples), :])
+                else:
+                    Z.append(Zs)
+            if(not do_fit):
+                return np.vstack(Z)
+
 
     def forward(self, X):
 
@@ -95,8 +144,13 @@ class Hydra():
             else:
                 Z = feats
 
-        return Z 
+        return Z
 
+    def fit_classifier(self, X, Y):
+        self.cfg.get_classf().fit(X,Y)
+
+    def score(self, X, Y):
+        return self.cfg.get_classf().score(X,Y)
 
 class SparseScaler():
 
@@ -108,8 +162,6 @@ class SparseScaler():
         self.fitted = False
 
     def fit(self, X):
-
-        assert not self.fitted, "Already fitted."
 
         X = np.sqrt(np.clip(X, a_min=0, a_max=None))
 
