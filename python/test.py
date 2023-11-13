@@ -4,7 +4,7 @@ import sys
 import time
 from nanohydra.hydra import NanoHydra
 
-DATASETS    = ["FiftyWords"]
+DATASETS    = ["ECG5000"]
 BATCH_TRAIN = True
 
 X  = {'test': {}, 'train': {}}
@@ -38,7 +38,7 @@ if __name__ == "__main__":
         input_length = Xtrain.shape[1]
 
         # Initialize the kernel transformer, scaler and classifier
-        model  = NanoHydra(input_length=input_length, k=64, g=32, dist="binomial", classifier="Logistic", scaler="Sparse")    
+        model  = NanoHydra(input_length=input_length, k=8, g=8, dist="binomial", classifier="Logistic", scaler="Sparse")    
 
         # Transform and scale
         print(f"Transforming {Xtrain.shape[0]} training examples...")
@@ -58,10 +58,12 @@ if __name__ == "__main__":
 
         # Test the classifier
         print(f"Transforming Test Fold...")
-        Xr = model.forward(Xtest)
-        model.fit_scaler(Xr)
-        Xr = model.forward_scaler(Xr)
+        Xr = model.forward_batch(Xtest, 100, do_fit=False)
+        Ypred = model.predict_batch(Xr, 100)
+        print(f"Ypred shape: {Ypred.shape}")
+        score_man = model.score_manual(Ypred, Ytest, "subset")
         score = model.score(Xr, Ytest)
-        print(f"Score for '{ds}': {100*score:0.02f} %") 	
+        print(f"Score (Aut) for '{ds}': {100*score:0.02f} %") 	
+        print(f"Score (Man) for '{ds}': {100*score:0.02f} %") 	
 
     print(f"Execution of {Ns} examples took {time.perf_counter()-start} seconds")

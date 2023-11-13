@@ -149,6 +149,19 @@ class NanoHydra():
     def fit_classifier(self, X, Y):
         self.cfg.get_classf().fit(X,Y)
 
+    def predict_batch(self, X, batch_size = 256):
+        num_examples = X.shape[0]
+        Y = []
+        for idx in range(0, num_examples, batch_size):
+            partialY = self.cfg.get_classf().predict(X[idx:min(idx+batch_size, num_examples)])
+            Y.append(partialY)
+        return np.hstack(Y)
+
+    def score_manual(self, Ypred, Ytest, method="subset"):
+        assert len(Ypred) == len(Ytest), f"The prediction array and the expected output arrays are not the same length. {len(Ypred)} vs {len(Ytest)}"
+        if(method.lower() == "subset"):
+            return np.sum(Ypred == Ytest)/len(Ypred)
+
     def score(self, X, Y):
         return self.cfg.get_classf().score(X,Y)
 

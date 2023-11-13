@@ -21,6 +21,9 @@ build_lib:
 test: 
 	$(PYTHONPATH) test.py 10000
 
+test_sc: 
+	$(PYTHONPATH) test_sc.py 10000
+
 run_ucr_benchmark: 
 	$(PYTHONPATH) run_ucr_benchmark.py all
 
