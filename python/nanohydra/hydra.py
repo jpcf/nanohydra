@@ -1,8 +1,14 @@
+import time
 import numpy as np
-from sklearn.linear_model                import RidgeClassifierCV, SGDClassifier
-from .optimized_fns.conv1d_opt import conv1d_opt
+from sklearn.linear_model             import RidgeClassifierCV, SGDClassifier
+from sklearn.tree                     import DecisionTreeClassifier, ExtraTreeClassifier
+import h5py
+
+from .optimized_fns.conv1d_opt        import conv1d_opt
 from .optimized_fns.hard_counting_opt import hard_counting_opt
 from .optimized_fns.soft_counting_opt import soft_counting_opt
+
+WORK_FOLDER = "./work/"
 
 class NanoHydraCfg():
     def __init__(self, seed, scalertype, classifiertype, classifier_args=None):
@@ -14,11 +20,13 @@ class NanoHydraCfg():
 
         # Define Classifier
         if(classifiertype.lower() == "logistic"):
-            self.classf = SGDClassifier(loss='log_loss', alpha=0.01, n_jobs=16)
+            self.classf = SGDClassifier(loss='log_loss', alpha=0.01, shuffle=True, n_jobs=22, learning_rate='adaptive', eta0=1e-2, early_stopping=True, n_iter_no_change=5)
         elif(classifiertype.lower() == "ridge"):
             self.classf = RidgeClassifierCV(alphas=np.logspace(-3,3,10))
-        else:
-            print("Unknown classifier type")
+        elif(classifiertype.lower() == "perceptron"):
+            self.classf = SGDClassifier(loss='perceptron', alpha=0.001, shuffle=True, n_jobs=22, learning_rate='adaptive', eta0=1e-2, early_stopping=True, n_iter_no_change=5)
+        elif(classifiertype.lower() == "tree"):
+            self.classf = ExtraTreeClassifier()
 
         self.seed = seed
 
@@ -31,6 +39,9 @@ class NanoHydraCfg():
     def get_seed(self):
         return self.seed
 
+    def set_seed(self, seed):
+        self.seed = seed
+
 class NanoHydra():
 
     __KERNEL_LEN = 9
@@ -39,7 +50,7 @@ class NanoHydra():
 
         self.cfg = NanoHydraCfg(seed= seed, scalertype=scaler, classifiertype=classifier)
 
-        rng = np.random.default_rng(seed=self.cfg.get_seed())
+        self.__set_seed(self.cfg.get_seed())
 
         self.k = k # num kernels per group
         self.g = g # num groups
@@ -56,11 +67,18 @@ class NanoHydra():
         self.h = self.g // self.divisor
 
         if(dist == "normal"):
-            self.W = rng.standard_normal(size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN)).astype(np.float32)
+            self.W = self.rng.standard_normal(size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN)).astype(np.float32)
             self.W = self.W - np.mean(self.W)
             self.W = self.W / np.sum(np.abs(self.W))
         elif(dist == "binomial"):
-            self.W = rng.choice([-1, 1], size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN), p=[0.5, 0.5]).astype(np.float32)
+            self.W = self.rng.choice([-1, 1], size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN), p=[0.5, 0.5]).astype(np.float32)
+
+    def __set_seed(self, seed):
+        if(seed is None):
+            seed = int(time.time())
+        self.cfg.set_seed(seed)
+        print(f"Setted Seed: {self.cfg.get_seed()}")
+        self.rng = np.random.default_rng(seed=self.cfg.get_seed())
 
     def fit_scaler(self, X, num_samples=None):
         if(num_samples is not None):
@@ -76,26 +94,23 @@ class NanoHydra():
     # transform in batches of *batch_size*
     def forward_batch(self, X, batch_size = 256, do_fit=True, Y=None):
         num_examples = X.shape[0]
-        if num_examples <= batch_size:
-            return self.forward(X)
-        else:
-            Z = []
-            for idx in range(0, num_examples, batch_size):
-                print(f"Range: {idx}:{min(idx+batch_size, num_examples)}")
-                Zt = self.forward(X[idx:min(idx+batch_size, num_examples)])
-                self.fit_scaler(Zt)
-                Zs = self.forward_scaler(Zt)
 
-                if(do_fit):
-                    if(idx==0):
-                        self.cfg.get_classf().partial_fit(Zs, Y[idx:min(idx+batch_size, num_examples), :], np.unique(Y))
-                    else:
-                        self.cfg.get_classf().partial_fit(Zs, Y[idx:min(idx+batch_size, num_examples), :])
+        Z = []
+        for idx in range(0, num_examples, batch_size):
+            print(f"Range: {idx}:{min(idx+batch_size, num_examples)}")
+            Zt = self.forward(X[idx:min(idx+batch_size, num_examples)])
+            self.fit_scaler(Zt)
+            Zs = self.forward_scaler(Zt)
+
+            if(do_fit):
+                if(idx==0):
+                    self.cfg.get_classf().partial_fit(Zs, Y[idx:min(idx+batch_size, num_examples)], np.unique(Y))
                 else:
-                    Z.append(Zs)
-            if(not do_fit):
-                return np.vstack(Z)
-
+                    self.cfg.get_classf().partial_fit(Zs, Y[idx:min(idx+batch_size, num_examples)])
+            else:
+                Z.append(Zs)
+        if(not do_fit):
+            return np.vstack(Z)
 
     def forward(self, X):
 
@@ -143,6 +158,33 @@ class NanoHydra():
                 Z = np.concatenate((Z,feats), axis=1)
             else:
                 Z = feats
+
+        return Z
+
+    def __generate_filename_trf_cache(self, ds_name):
+        ds_name = ds_name.lower()
+        return f"{ds_name}_k_{self.k}_g_{self.k}_d_{self.num_dilations}"
+
+    def save_transform(self, Z, ds_name, path):
+        filepath = f"{path}/{self.__generate_filename_trf_cache(ds_name)}.h5"
+        
+        with h5py.File(filepath, "w") as f:
+            print("Caching transform to file 'filepath'...")
+            ds = f.create_dataset(self.__generate_filename_trf_cache(ds_name), Z.shape, data=Z, compression="gzip", compression_opts=9)
+            print(f"Seed: {self.cfg.get_seed()}")
+            ds.attrs['Seed'] = self.cfg.get_seed()
+            print("Done!")
+
+    def load_transform(self, ds_name, path):
+        filepath = f"{path}/{self.__generate_filename_trf_cache(ds_name)}.h5"
+
+        try:
+            with h5py.File(filepath, "r") as f:
+                Z = np.array(f[self.__generate_filename_trf_cache(ds_name)][:])
+                print(f"Recorded Seed: {f[self.__generate_filename_trf_cache(ds_name)].attrs['Seed']}")
+                self.__set_seed(f[self.__generate_filename_trf_cache(ds_name)].attrs['Seed'])
+        except FileNotFoundError:
+            return None
 
         return Z
 

@@ -38,7 +38,7 @@ if __name__ == "__main__":
         input_length = Xtrain.shape[1]
 
         # Initialize the kernel transformer, scaler and classifier
-        model  = NanoHydra(input_length=input_length, k=8, g=8, dist="binomial", classifier="Logistic", scaler="Sparse")    
+        model  = NanoHydra(input_length=input_length, k=8, g=8, dist="binomial", classifier="Logistic", scaler="Sparse", seed=10)    
 
         # Transform and scale
         print(f"Transforming {Xtrain.shape[0]} training examples...")
@@ -53,8 +53,19 @@ if __name__ == "__main__":
             model.fit_classifier(Xts, Ytrain)
             print(f"Fitting the classifier")
         else:
-            Xt  = model.forward_batch(Xtrain, 100, do_fit=False)
+            Xt = model.load_transform(ds, "./work") 
+            if(Xt is None):
+                Xt  = model.forward_batch(Xtrain, 100, do_fit=False)
+                model.save_transform(Xt, ds, "./work")
+                print(f"Shape: {Xt.shape}")
+                print(Xt)
+            else:
+                print("Using cached transform...")
+                print(f"Shape: {Xt.shape}")
+                print(Xt)
             model.fit_classifier(Xt, Ytrain)
+
+        print(Xt)
 
         # Test the classifier
         print(f"Transforming Test Fold...")
@@ -65,5 +76,6 @@ if __name__ == "__main__":
         score = model.score(Xr, Ytest)
         print(f"Score (Aut) for '{ds}': {100*score:0.02f} %") 	
         print(f"Score (Man) for '{ds}': {100*score:0.02f} %") 	
-
+        #print(model.cfg.get_classf().coef_)
+        #print(np.array(model.cfg.get_classf().coef_).shape)
     print(f"Execution of {Ns} examples took {time.perf_counter()-start} seconds")
