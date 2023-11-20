@@ -38,7 +38,7 @@ if __name__ == "__main__":
         input_length = Xtrain.shape[1]
 
         # Initialize the kernel transformer, scaler and classifier
-        model  = NanoHydra(input_length=input_length, k=8, g=8, dist="binomial", classifier="Logistic", scaler="Sparse", seed=10)    
+        model  = NanoHydra(input_length=input_length, k=8, g=8, max_dilations=4, dist="binomial", classifier="Logistic", scaler="Sparse", seed=109)    
 
         # Transform and scale
         print(f"Transforming {Xtrain.shape[0]} training examples...")
@@ -53,27 +53,28 @@ if __name__ == "__main__":
             model.fit_classifier(Xts, Ytrain)
             print(f"Fitting the classifier")
         else:
-            Xt = model.load_transform(ds, "./work") 
+            Xt = model.load_transform(ds, "./work", "train") 
             if(Xt is None):
                 Xt  = model.forward_batch(Xtrain, 100, do_fit=False)
-                model.save_transform(Xt, ds, "./work")
-                print(f"Shape: {Xt.shape}")
-                print(Xt)
+                model.save_transform(Xt, ds, "./work", "train")
             else:
                 print("Using cached transform...")
-                print(f"Shape: {Xt.shape}")
-                print(Xt)
             model.fit_classifier(Xt, Ytrain)
 
         print(Xt)
 
         # Test the classifier
         print(f"Transforming Test Fold...")
-        Xr = model.forward_batch(Xtest, 100, do_fit=False)
-        Ypred = model.predict_batch(Xr, 100)
+        Xt = model.load_transform(ds, "./work", "test") 
+        if(Xt is None):
+            Xt  = model.forward_batch(Xtest, 100, do_fit=False)
+            model.save_transform(Xt, ds, "./work", "test")
+        else:
+            print("Using cached transform...")
+        Ypred = model.predict_batch(Xt, 100)
         print(f"Ypred shape: {Ypred.shape}")
         score_man = model.score_manual(Ypred, Ytest, "subset")
-        score = model.score(Xr, Ytest)
+        score = model.score(Xt, Ytest)
         print(f"Score (Aut) for '{ds}': {100*score:0.02f} %") 	
         print(f"Score (Man) for '{ds}': {100*score:0.02f} %") 	
         #print(model.cfg.get_classf().coef_)

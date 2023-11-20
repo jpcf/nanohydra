@@ -1,4 +1,5 @@
 import numpy as np
+import multiprocessing
 from cython.parallel import prange
 cimport numpy as cnp
 cimport cython
@@ -31,7 +32,7 @@ def conv1d_opt(cnp.ndarray[DTYPE_t, ndim=2] x, cnp.ndarray[DTYPE_t, ndim=3] w, u
 
         # Work-sharing construct must start here, since np.take uses gil.
         with nogil:
-            for h in prange(H, schedule='guided', num_threads=16):
+            for h in prange(H, schedule='guided', num_threads=20):
                 for k in range(K):
                     for xi in range(wlenD2, xdil_len, 1):
                         for wi in range(wlen):

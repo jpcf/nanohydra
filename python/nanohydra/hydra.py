@@ -72,6 +72,9 @@ class NanoHydra():
             self.W = self.W / np.sum(np.abs(self.W))
         elif(dist == "binomial"):
             self.W = self.rng.choice([-1, 1], size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN), p=[0.5, 0.5]).astype(np.float32)
+            print(self.W)
+        elif(dist == "tetranomial"):
+            self.W = self.rng.choice([-2, -1, 1, 2], size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN), p=[0.1, 0.4, 0.4, 0.1]).astype(np.float32)
 
     def __set_seed(self, seed):
         if(seed is None):
@@ -163,20 +166,20 @@ class NanoHydra():
 
     def __generate_filename_trf_cache(self, ds_name):
         ds_name = ds_name.lower()
-        return f"{ds_name}_k_{self.k}_g_{self.k}_d_{self.num_dilations}"
+        return f"{ds_name}_k_{self.k}_g_{self.g}_d_{self.num_dilations}"
 
-    def save_transform(self, Z, ds_name, path):
-        filepath = f"{path}/{self.__generate_filename_trf_cache(ds_name)}.h5"
+    def save_transform(self, Z, ds_name, path, split):
+        filepath = f"{path}/{self.__generate_filename_trf_cache(ds_name)}_{split}.h5"
         
         with h5py.File(filepath, "w") as f:
             print("Caching transform to file 'filepath'...")
-            ds = f.create_dataset(self.__generate_filename_trf_cache(ds_name), Z.shape, data=Z, compression="gzip", compression_opts=9)
+            ds = f.create_dataset(self.__generate_filename_trf_cache(ds_name), Z.shape, data=Z, chunks=True, compression="gzip", compression_opts=9)
             print(f"Seed: {self.cfg.get_seed()}")
             ds.attrs['Seed'] = self.cfg.get_seed()
             print("Done!")
 
-    def load_transform(self, ds_name, path):
-        filepath = f"{path}/{self.__generate_filename_trf_cache(ds_name)}.h5"
+    def load_transform(self, ds_name, path, split):
+        filepath = f"{path}/{self.__generate_filename_trf_cache(ds_name)}_{split}.h5"
 
         try:
             with h5py.File(filepath, "r") as f:
