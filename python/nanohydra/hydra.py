@@ -2,7 +2,9 @@ import time
 import numpy as np
 from sklearn.linear_model             import RidgeClassifierCV, SGDClassifier
 from sklearn.tree                     import DecisionTreeClassifier, ExtraTreeClassifier
+from sklearn.neural_network           import MLPClassifier
 import h5py
+import os
 
 from .optimized_fns.conv1d_opt        import conv1d_opt
 from .optimized_fns.hard_counting_opt import hard_counting_opt
@@ -20,13 +22,46 @@ class NanoHydraCfg():
 
         # Define Classifier
         if(classifiertype.lower() == "logistic"):
-            self.classf = SGDClassifier(loss='log_loss', alpha=0.01, shuffle=True, n_jobs=22, learning_rate='adaptive', eta0=1e-2, early_stopping=True, n_iter_no_change=5)
+            self.classf = SGDClassifier(
+                loss='modified_huber', 
+                alpha=0.001, 
+                penalty='elasticnet', 
+                class_weight="balanced", 
+                shuffle=True, 
+                n_jobs=22, 
+                verbose=1, 
+                tol=1e-4, 
+                learning_rate='adaptive', 
+                eta0=1e-3, 
+                n_iter_no_change=20
+            )
         elif(classifiertype.lower() == "ridge"):
             self.classf = RidgeClassifierCV(alphas=np.logspace(-3,3,10))
         elif(classifiertype.lower() == "perceptron"):
-            self.classf = SGDClassifier(loss='perceptron', alpha=0.001, shuffle=True, n_jobs=22, learning_rate='adaptive', eta0=1e-2, early_stopping=True, n_iter_no_change=5)
+            self.classf = SGDClassifier(
+                loss='perceptron', 
+                alpha=0.001, 
+                penalty='elasticnet', 
+                class_weight="balanced", 
+                shuffle=True, 
+                n_jobs=22, 
+                verbose=1, 
+                learning_rate='adaptive', 
+                eta0=1e-3, 
+                early_stopping=True, 
+                n_iter_no_change=10
+            )
         elif(classifiertype.lower() == "tree"):
             self.classf = ExtraTreeClassifier()
+        elif(classifiertype.lower() == "nn"):
+            self.classf = MLPClassifier(
+                hidden_layer_sizes=[40,20], 
+                activation="relu", 
+                batch_size=128, 
+                learning_rate_init=0.001,
+                verbose=1, 
+                n_iter_no_change=10, 
+                max_iter=500)
 
         self.seed = seed
 
@@ -49,6 +84,9 @@ class NanoHydra():
     def __init__(self, input_length, k = 8, g = 64, max_dilations=8, seed = None, dist = "normal", classifier="Logistic", scaler="Sparse"):
 
         self.cfg = NanoHydraCfg(seed= seed, scalertype=scaler, classifiertype=classifier)
+        self.dist = dist
+        self.input_length = input_length
+        self.classifier = classifier
 
         self.__set_seed(self.cfg.get_seed())
 
@@ -61,7 +99,7 @@ class NanoHydra():
         self.dilations = np.insert(self.dilations, 0, 0)
         self.num_dilations = len(self.dilations)
 
-        self.paddings = np.round(np.divide((9 - 1) * self.dilations, 2)).astype(np.uint32)
+        self.paddings = np.round(np.divide((self.__KERNEL_LEN - 1) * self.dilations, 2)).astype(np.uint32)
 
         self.divisor = min(2, self.g)
         self.h = self.g // self.divisor
@@ -72,9 +110,15 @@ class NanoHydra():
             self.W = self.W / np.sum(np.abs(self.W))
         elif(dist == "binomial"):
             self.W = self.rng.choice([-1, 1], size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN), p=[0.5, 0.5]).astype(np.float32)
-            print(self.W)
         elif(dist == "tetranomial"):
             self.W = self.rng.choice([-2, -1, 1, 2], size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN), p=[0.1, 0.4, 0.4, 0.1]).astype(np.float32)
+
+        # Preliminary message with model dimensions
+        self.evaluate_model_size()
+        print(f"nanoHydra model with Transform  size {self.size['transform']} kB and Complexity {self.complexity_mmacs['transform']} mflops")
+        print(f"nanoHydra model with Classifier size {self.size['classifier']} kB and Complexity {self.complexity_mmacs['classifier']} mflops")
+        print(f"Model Size  Partition: {100*self.size['transform']/self.size['total']:.2f} Transform % vs {100*self.size['classifier']/self.size['total']:.2f} % Classifier")
+        print(f"Model Compl Partition: {100*self.complexity_mmacs['transform']/self.complexity_mmacs['total']:.2f} Transform % vs {100*self.complexity_mmacs['classifier']/self.complexity_mmacs['total']:.2f} % Classifier")
 
     def __set_seed(self, seed):
         if(seed is None):
@@ -82,6 +126,36 @@ class NanoHydra():
         self.cfg.set_seed(seed)
         print(f"Setted Seed: {self.cfg.get_seed()}")
         self.rng = np.random.default_rng(seed=self.cfg.get_seed())
+
+    def evaluate_model_size(self):
+        self.size             = {'transform': 0, 'classifier': 0, 'feature_vec': 0, 'total': 0}
+        self.complexity_mmacs = {'transform': 0, 'classifier': 0}
+
+        # Calculate number of weights in transform
+        if(self.dist == "normal"):
+            bits_per_w = 32
+        elif(self.dist == "normal_q16"):
+            bits_per_w = 16
+        elif(self.dist == "tetranomial"):
+            bits_per_w = 2
+        elif(self.dist == "binomial"):
+            bits_per_w = 1
+
+        # Size of transform
+        # Note that 1kB = 2**10 bytes
+        self.size['transform']              = self.W.size * bits_per_w / 8 / (2**10)
+        self.size['feature_vec']            = self.W.size / self.__KERNEL_LEN
+        self.complexity_mmacs['transform']  = self.input_length * self.W.size / 1e6
+
+        # Size of classifier. Assumer weights will be quantized to 8bits
+        self.size['classifier']             = self.size['feature_vec'] / (2**10)
+        self.complexity_mmacs['classifier'] = self.size['feature_vec'] / 1e6
+        #self.size['classifier']             = self.cfg.get_classf().coef_.size / (2**10)
+        #self.complexity_mmacs['classifier'] = self.cfg.get_classf().coef_.size
+
+        # Total size (in Flash memory)
+        self.size['total']             = self.size['transform'] + self.size['classifier']
+        self.complexity_mmacs['total'] = self.complexity_mmacs['transform'] + self.complexity_mmacs['classifier']
 
     def fit_scaler(self, X, num_samples=None):
         if(num_samples is not None):
@@ -180,13 +254,13 @@ class NanoHydra():
 
     def load_transform(self, ds_name, path, split):
         filepath = f"{path}/{self.__generate_filename_trf_cache(ds_name)}_{split}.h5"
-
         try:
             with h5py.File(filepath, "r") as f:
                 Z = np.array(f[self.__generate_filename_trf_cache(ds_name)][:])
                 print(f"Recorded Seed: {f[self.__generate_filename_trf_cache(ds_name)].attrs['Seed']}")
                 self.__set_seed(f[self.__generate_filename_trf_cache(ds_name)].attrs['Seed'])
-        except FileNotFoundError:
+        except FileNotFoundError as e:
+            print(f"Exception: {e}")
             return None
 
         return Z
@@ -194,16 +268,24 @@ class NanoHydra():
     def fit_classifier(self, X, Y):
         self.cfg.get_classf().fit(X,Y)
 
-    def predict_batch(self, X, batch_size = 256):
+    def predict_batch(self, X, batch_size = 256, type = "prob"):
         num_examples = X.shape[0]
         Y = []
         for idx in range(0, num_examples, batch_size):
-            partialY = self.cfg.get_classf().predict(X[idx:min(idx+batch_size, num_examples)])
+            if(type == "predict"):
+                partialY = self.cfg.get_classf().predict(X[idx:min(idx+batch_size, num_examples)])
+            elif(type == "prob"):
+                partialY = self.cfg.get_classf().predict_proba(X[idx:min(idx+batch_size, num_examples)])
             Y.append(partialY)
         return np.hstack(Y)
 
     def score_manual(self, Ypred, Ytest, method="subset"):
         assert len(Ypred) == len(Ytest), f"The prediction array and the expected output arrays are not the same length. {len(Ypred)} vs {len(Ytest)}"
+
+        # If Ypred are probs, first calculate Top-One
+        if(method.lower() == "prob"):
+            Ypred = np.argmax(Ypred, axis=1)
+
         if(method.lower() == "subset"):
             return np.sum(Ypred == Ytest)/len(Ypred)
 

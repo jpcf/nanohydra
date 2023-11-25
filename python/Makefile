@@ -35,7 +35,7 @@ profile_hydra:
 	$(PYTHONPATH)  profile_hydra.py
 
 download_speech_commands:
-	$(PYTHONPATH)  scripts/download_sc.py
+	$(PYTHONPATH)  download_sc.py
 
 test_speech_commands: 
 	$(PYTHONPATH) test_sc.py 90000
