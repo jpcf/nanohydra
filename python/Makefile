@@ -18,6 +18,9 @@ setup_py:
 build_lib:
 	$(PYTHONPATH) ./nanohydra/setup.py build_ext --build-lib=./nanohydra/optimized_fns
 
+clean_lib:
+	rm nanohydra/optimized_fns/*.c nanohydra/optimized_fns/*.so
+
 test: 
 	$(PYTHONPATH) test.py 10000
 
@@ -39,3 +42,8 @@ download_speech_commands:
 
 test_speech_commands: 
 	$(PYTHONPATH) test_sc.py 90000
+
+
+# Testing
+test_conv1d:
+	$(PYTHONPATH) test_conv_fn_equivalence.py
