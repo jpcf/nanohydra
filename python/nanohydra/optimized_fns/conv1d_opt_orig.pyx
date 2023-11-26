@@ -6,15 +6,12 @@ cimport cython
 
 cnp.import_array()
 
-DTYPE_X = np.int16
-ctypedef cnp.int16_t DTYPE_X_t
-
-DTYPE_W = np.int16
-ctypedef cnp.int16_t DTYPE_W_t
+DTYPE = np.float32
+ctypedef cnp.float32_t DTYPE_t
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def conv1d_opt_x_int16_w_b1(cnp.ndarray[DTYPE_X_t, ndim=2] x, cnp.ndarray[DTYPE_W_t, ndim=3] w, unsigned int dilation):
+def conv1d_opt_orig(cnp.ndarray[DTYPE_t, ndim=2] x, cnp.ndarray[DTYPE_t, ndim=3] w, unsigned int dilation):
 
     cdef unsigned int num_examples = x.shape[0]
     cdef unsigned int xlen   = x.shape[1]
@@ -24,10 +21,10 @@ def conv1d_opt_x_int16_w_b1(cnp.ndarray[DTYPE_X_t, ndim=2] x, cnp.ndarray[DTYPE_
     cdef unsigned int K = w.shape[1]
     cdef unsigned int xdil_len = int(xlen/(dilation+1))
 
-    cdef unsigned int h,k,xi,wi,xidx,ex
+    cdef unsigned int h,k,xi,wi
 
-    cdef cnp.ndarray[DTYPE_X_t, ndim=4] Y = np.zeros([num_examples, H, K, xdil_len], dtype=DTYPE_X)
-    cdef cnp.ndarray[DTYPE_X_t, ndim=1] x_dil = np.zeros([xlen+wlen], dtype=DTYPE_X)
+    cdef cnp.ndarray[DTYPE_t, ndim=4] Y     = np.zeros([num_examples, H, K, xdil_len], dtype=DTYPE)
+    cdef cnp.ndarray[DTYPE_t, ndim=1] x_dil = np.zeros([xlen+wlen], dtype=DTYPE)
 
     for ex in range(num_examples):
         # Calculate the current dilation for the given example
@@ -40,4 +37,5 @@ def conv1d_opt_x_int16_w_b1(cnp.ndarray[DTYPE_X_t, ndim=2] x, cnp.ndarray[DTYPE_
                     for xi in range(0, xdil_len, 1):
                         for wi in range(wlen):
                             Y[ex, h, k, xi] += x_dil[xi+wi]*w[h,k,wi]
+
     return Y

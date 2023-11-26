@@ -24,21 +24,17 @@ def conv1d_opt_x_f32_w_b1(cnp.ndarray[DTYPE_X_t, ndim=2] x, cnp.ndarray[DTYPE_W_
     cdef unsigned int K = w.shape[1]
     cdef unsigned int xdil_len = int(xlen/(dilation+1))
 
-    cdef unsigned int h,k,xi,wi
+    cdef unsigned int h,k,xi,wi,xidx,ex
 
-    cdef cnp.ndarray[DTYPE_X_t, ndim=4] Y     = np.zeros([num_examples, H, K, xdil_len], dtype=DTYPE_X)
-    cdef cnp.ndarray[DTYPE_X_t, ndim=1] x_dil = np.zeros([xlen+wlen], dtype=DTYPE_X)
+    cdef cnp.ndarray[DTYPE_X_t, ndim=4] Y = np.zeros([num_examples, H, K, xdil_len], dtype=DTYPE_X)
 
-    for ex in range(num_examples):
-        # Calculate the current dilation for the given example
-        x_dil[wlenD2:wlenD2+xdil_len] = np.take(x[ex,:], [(1+dilation)*i for i in range(xdil_len)])
-
-        # Work-sharing construct must start here, since np.take uses gil.
-        with nogil:
-            for h in prange(H, schedule='guided', num_threads=20):
+    with nogil:
+        for ex in prange(num_examples, schedule='static', num_threads=24):
+            for h in range(H):
                 for k in range(K):
-                    for xi in range(0, xdil_len, 1):
+                    for xi in range(0, xlen, 1):
                         for wi in range(wlen):
-                            Y[ex, h, k, xi] += x_dil[xi+wi]*w[h,k,wi]
-
+                            xidx = (1+dilation)*(xi+wi-wlenD2)
+                            if(xidx >= 0 and xidx < xlen):
+                                Y[ex, h, k, xi] += x[ex,xidx]*w[h,k,wi]
     return Y

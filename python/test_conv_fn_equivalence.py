@@ -1,13 +1,14 @@
+from nanohydra.optimized_fns.conv1d_opt_orig                import conv1d_opt_orig
 from nanohydra.optimized_fns.conv1d_opt_x_f32_w_f32         import conv1d_opt_x_f32_w_f32
 from nanohydra.optimized_fns.conv1d_opt_x_f32_w_b1          import conv1d_opt_x_f32_w_b1
 from nanohydra.optimized_fns.conv1d_opt_x_int16_w_b1        import conv1d_opt_x_int16_w_b1
-from nanohydra.optimized_fns.conv1d_opt_x_int16_w_b1_notake import conv1d_opt_x_int16_w_b1_notake
 import numpy as np
 import time
 
 # Input vector params
 NUM_EXAMPLES  = 300
 INPUT_VEC_LEN = 16000
+DIL = 7
 
 # Weight matrix params
 DIVISOR    = 2
@@ -19,7 +20,7 @@ KERNEL_LEN = 9
 if __name__ == '__main__':
 
     # Constants
-    FUNCS = ['orig', 'x_f32_w_b1', 'x_int16_w_b1', 'x_int16_w_b1_notake']
+    FUNCS = ['orig', 'x_f32_w_f32', 'x_f32_w_b1', 'x_int16_w_b1']
 
     # Test vars
     times  = {k:0 for k in FUNCS}
@@ -35,25 +36,23 @@ if __name__ == '__main__':
 
     # Transform data
     start = time.perf_counter()
-    Y['orig'] = conv1d_opt_x_f32_w_f32(X.astype(np.float32), W.astype(np.float32), 0)
+    Y['orig'] = conv1d_opt_orig(X.astype(np.float32), W.astype(np.float32), DIL)
     times['orig']  = time.perf_counter()-start
 
     start = time.perf_counter()
-    Y['x_f32_w_b1']     = conv1d_opt_x_f32_w_b1(X.astype(np.float32), W, 0)
+    Y['x_f32_w_f32']     = conv1d_opt_x_f32_w_f32(X.astype(np.float32), W.astype(np.float32), DIL)
+    times['x_f32_w_f32'] = time.perf_counter()-start
+    errors['x_f32_w_f32'] = np.sum(np.abs(Y['x_f32_w_f32']-Y['orig']))
+
+    start = time.perf_counter()
+    Y['x_f32_w_b1']     = conv1d_opt_x_f32_w_b1(X.astype(np.float32), W, DIL)
     times['x_f32_w_b1'] = time.perf_counter()-start
     errors['x_f32_w_b1'] = np.sum(np.abs(Y['x_f32_w_b1']-Y['orig']))
 
     start = time.perf_counter()
-    Y['x_int16_w_b1']     = conv1d_opt_x_int16_w_b1(X, W, 0)
+    Y['x_int16_w_b1']     = conv1d_opt_x_int16_w_b1(X, W, DIL)
     times['x_int16_w_b1'] = time.perf_counter()-start
     errors['x_int16_w_b1'] = np.sum(np.abs(Y['x_int16_w_b1']-Y['orig']))
-
-    print(np.abs(Y['x_int16_w_b1'][0,0,0]-Y['orig'][0,0,0]))
-    start = time.perf_counter()
-    Y['x_int16_w_b1_notake']      = conv1d_opt_x_int16_w_b1_notake(X, W, 0)
-    times['x_int16_w_b1_notake']  = time.perf_counter()-start
-    errors['x_int16_w_b1_notake'] = np.sum(np.abs(Y['x_int16_w_b1_notake']-Y['orig']))
-
 
     # Print Results
     for k,v in errors.items():

@@ -211,7 +211,7 @@ class NanoHydra():
                 _X = X if diff_index == 0 else diff_X
                 # Perform convolution on all kernels of a given dilation
                 #print(f"Current Dilation: {d}")
-                _Z = conv1d_opt_x_f32_w_f32(_X, self.W[dilation_index, diff_index], dilation = d)
+                _Z = conv1d_opt_orig(_X, self.W[dilation_index, diff_index], dilation = d)
 
                 # For each example, calculate the (arg)max/min over the k kernels of a given group.
                 # Here we should "collapse" the second dimension of the tensor, where the kernel indices are.
