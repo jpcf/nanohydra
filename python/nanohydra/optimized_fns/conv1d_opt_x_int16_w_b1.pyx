@@ -37,7 +37,7 @@ def conv1d_opt_x_int16_w_b1(cnp.ndarray[DTYPE_X_t, ndim=2] x, cnp.ndarray[DTYPE_
         with nogil:
             for h in prange(H, schedule='guided', num_threads=20):
                 for k in range(K):
-                    for xi in range(wlenD2, xdil_len, 1):
+                    for xi in range(0, xdil_len, 1):
                         for wi in range(wlen):
                             Y[ex, h, k, xi] += x_dil[xi+wi]*w[h,k,wi]
     return Y

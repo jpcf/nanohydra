@@ -6,6 +6,8 @@ PYTHONPATH=$(PYTHONENV)/bin/$(PYTHON)
 PIPPATH=$(PYTHONENV)/bin/$(PIP)
 KERNPROFPATH=$(PYTHONENV)/bin/$(KERNPROF)
 
+.PHONY: test
+
 setup:
 	sudo apt install $(PYTHON)  $(PYTHON)-venv $(PYTHON)-pip
 
@@ -24,9 +26,6 @@ clean_lib:
 test: 
 	$(PYTHONPATH) test.py 10000
 
-test_sc: 
-	$(PYTHONPATH) test_sc.py 10000
-
 run_ucr_benchmark: 
 	$(PYTHONPATH) run_ucr_benchmark.py all
 
@@ -42,7 +41,6 @@ download_speech_commands:
 
 test_speech_commands: 
 	$(PYTHONPATH) test_sc.py 90000
-
 
 # Testing
 test_conv1d:

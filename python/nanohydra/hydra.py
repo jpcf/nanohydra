@@ -6,7 +6,7 @@ from sklearn.neural_network           import MLPClassifier
 import h5py
 import os
 
-from .optimized_fns.conv1d_opt        import conv1d_opt
+from .optimized_fns.conv1d_opt_x_f32_w_f32        import conv1d_opt_x_f32_w_f32
 from .optimized_fns.hard_counting_opt import hard_counting_opt
 from .optimized_fns.soft_counting_opt import soft_counting_opt
 
@@ -23,13 +23,13 @@ class NanoHydraCfg():
         # Define Classifier
         if(classifiertype.lower() == "logistic"):
             self.classf = SGDClassifier(
-                loss='modified_huber', 
+                loss='log_loss', 
                 alpha=0.001, 
-                penalty='elasticnet', 
+                penalty='l1', 
                 class_weight="balanced", 
                 shuffle=True, 
                 n_jobs=22, 
-                verbose=1, 
+                verbose=0, 
                 tol=1e-4, 
                 learning_rate='adaptive', 
                 eta0=1e-3, 
@@ -115,10 +115,10 @@ class NanoHydra():
 
         # Preliminary message with model dimensions
         self.evaluate_model_size()
-        print(f"nanoHydra model with Transform  size {self.size['transform']} kB and Complexity {self.complexity_mmacs['transform']} mflops")
-        print(f"nanoHydra model with Classifier size {self.size['classifier']} kB and Complexity {self.complexity_mmacs['classifier']} mflops")
-        print(f"Model Size  Partition: {100*self.size['transform']/self.size['total']:.2f} Transform % vs {100*self.size['classifier']/self.size['total']:.2f} % Classifier")
-        print(f"Model Compl Partition: {100*self.complexity_mmacs['transform']/self.complexity_mmacs['total']:.2f} Transform % vs {100*self.complexity_mmacs['classifier']/self.complexity_mmacs['total']:.2f} % Classifier")
+        #print(f"nanoHydra model with Transform  size {self.size['transform']} kB and Complexity {self.complexity_mmacs['transform']} mflops")
+        #print(f"nanoHydra model with Classifier size {self.size['classifier']} kB and Complexity {self.complexity_mmacs['classifier']} mflops")
+        #print(f"Model Size  Partition: {100*self.size['transform']/self.size['total']:.2f} Transform % vs {100*self.size['classifier']/self.size['total']:.2f} % Classifier")
+        #print(f"Model Compl Partition: {100*self.complexity_mmacs['transform']/self.complexity_mmacs['total']:.2f} Transform % vs {100*self.complexity_mmacs['classifier']/self.complexity_mmacs['total']:.2f} % Classifier")
 
     def __set_seed(self, seed):
         if(seed is None):
@@ -174,7 +174,7 @@ class NanoHydra():
 
         Z = []
         for idx in range(0, num_examples, batch_size):
-            print(f"Range: {idx}:{min(idx+batch_size, num_examples)}")
+            #print(f"Range: {idx}:{min(idx+batch_size, num_examples)}")
             Zt = self.forward(X[idx:min(idx+batch_size, num_examples)])
             self.fit_scaler(Zt)
             Zs = self.forward_scaler(Zt)
@@ -211,7 +211,7 @@ class NanoHydra():
                 _X = X if diff_index == 0 else diff_X
                 # Perform convolution on all kernels of a given dilation
                 #print(f"Current Dilation: {d}")
-                _Z = conv1d_opt(_X, self.W[dilation_index, diff_index], dilation = d)
+                _Z = conv1d_opt_x_f32_w_f32(_X, self.W[dilation_index, diff_index], dilation = d)
 
                 # For each example, calculate the (arg)max/min over the k kernels of a given group.
                 # Here we should "collapse" the second dimension of the tensor, where the kernel indices are.
@@ -268,16 +268,13 @@ class NanoHydra():
     def fit_classifier(self, X, Y):
         self.cfg.get_classf().fit(X,Y)
 
-    def predict_batch(self, X, batch_size = 256, type = "prob"):
+    def predict_batch(self, X, batch_size = 256):
         num_examples = X.shape[0]
         Y = []
         for idx in range(0, num_examples, batch_size):
-            if(type == "predict"):
-                partialY = self.cfg.get_classf().predict(X[idx:min(idx+batch_size, num_examples)])
-            elif(type == "prob"):
-                partialY = self.cfg.get_classf().predict_proba(X[idx:min(idx+batch_size, num_examples)])
+            partialY = self.cfg.get_classf().predict(X[idx:min(idx+batch_size, num_examples)])
             Y.append(partialY)
-        return np.hstack(Y)
+        return np.concatenate(Y)
 
     def score_manual(self, Ypred, Ytest, method="subset"):
         assert len(Ypred) == len(Ytest), f"The prediction array and the expected output arrays are not the same length. {len(Ypred)} vs {len(Ytest)}"

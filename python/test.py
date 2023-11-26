@@ -25,6 +25,8 @@ if __name__ == "__main__":
 
         Ns = min(X['test'][ds].shape[0], num_ex)
 
+        print(f"Type of X: {X['train'][ds].dtype}")
+
         # The split argument splits into the opposite fold. Therefore, we here cross them back
         # together into the correct one.
         Xtrain = X['test'][ds][:Ns,:].astype(np.float32)
@@ -38,7 +40,7 @@ if __name__ == "__main__":
         input_length = Xtrain.shape[1]
 
         # Initialize the kernel transformer, scaler and classifier
-        model  = NanoHydra(input_length=input_length, k=8, g=8, max_dilations=4, dist="binomial", classifier="Logistic", scaler="Sparse", seed=109)    
+        model  = NanoHydra(input_length=input_length, k=8, g=8, max_dilations=8, dist="binomial", classifier="Logistic", scaler="Sparse", seed=109)    
 
         # Transform and scale
         print(f"Transforming {Xtrain.shape[0]} training examples...")
@@ -60,8 +62,6 @@ if __name__ == "__main__":
             else:
                 print("Using cached transform...")
             model.fit_classifier(Xt, Ytrain)
-
-        print(Xt)
 
         # Test the classifier
         print(f"Transforming Test Fold...")

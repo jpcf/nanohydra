@@ -1,6 +1,7 @@
-from nanohydra.optimized_fns.conv1d_opt_x_f32_w_f32  import conv1d_opt_x_f32_w_f32
-from nanohydra.optimized_fns.conv1d_opt_x_f32_w_b1   import conv1d_opt_x_f32_w_b1
-from nanohydra.optimized_fns.conv1d_opt_x_int16_w_b1 import conv1d_opt_x_int16_w_b1
+from nanohydra.optimized_fns.conv1d_opt_x_f32_w_f32         import conv1d_opt_x_f32_w_f32
+from nanohydra.optimized_fns.conv1d_opt_x_f32_w_b1          import conv1d_opt_x_f32_w_b1
+from nanohydra.optimized_fns.conv1d_opt_x_int16_w_b1        import conv1d_opt_x_int16_w_b1
+from nanohydra.optimized_fns.conv1d_opt_x_int16_w_b1_notake import conv1d_opt_x_int16_w_b1_notake
 import numpy as np
 import time
 
@@ -18,7 +19,7 @@ KERNEL_LEN = 9
 if __name__ == '__main__':
 
     # Constants
-    FUNCS = ['orig', 'x_f32_w_b1', 'x_int16_w_b1']
+    FUNCS = ['orig', 'x_f32_w_b1', 'x_int16_w_b1', 'x_int16_w_b1_notake']
 
     # Test vars
     times  = {k:0 for k in FUNCS}
@@ -46,6 +47,13 @@ if __name__ == '__main__':
     Y['x_int16_w_b1']     = conv1d_opt_x_int16_w_b1(X, W, 0)
     times['x_int16_w_b1'] = time.perf_counter()-start
     errors['x_int16_w_b1'] = np.sum(np.abs(Y['x_int16_w_b1']-Y['orig']))
+
+    print(np.abs(Y['x_int16_w_b1'][0,0,0]-Y['orig'][0,0,0]))
+    start = time.perf_counter()
+    Y['x_int16_w_b1_notake']      = conv1d_opt_x_int16_w_b1_notake(X, W, 0)
+    times['x_int16_w_b1_notake']  = time.perf_counter()-start
+    errors['x_int16_w_b1_notake'] = np.sum(np.abs(Y['x_int16_w_b1_notake']-Y['orig']))
+
 
     # Print Results
     for k,v in errors.items():
