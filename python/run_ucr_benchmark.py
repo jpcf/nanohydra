@@ -4,36 +4,32 @@ import numpy as np
 import pandas as pd
 import sys
 import time
-from tsc.hydra import Hydra, SparseScaler
-
-DATASETS = ["ECG5000"]
+from nanohydra.hydra import NanoHydra
 
 X  = {'test': {}, 'train': {}}
 y  = {'test': {}, 'train': {}}
 
 CSV_PATH = "./data/results_ucr112_variants.csv"
-BEST_OF = 10
+BEST_OF      = 40
 
 def training_round(Xtrain, Xtest, Ytrain, Ytest, k=8, g=64, seed=None):
 
     input_length = Xtrain.shape[1]
-    
-    cl = RidgeClassifierCV(alphas=np.logspace(-3,3,10))
-    model  = Hydra(input_length=input_length, k=k,g=g, dist="binomial", seed=seed)    
-    scaler = SparseScaler()
 
-    # Transform and scale
-    Xt  = model.forward(Xtrain)
-    Xts = scaler.fit_transform(Xt) 
+    # Initialize Model 
+    model  = NanoHydra(input_length=input_length, k=k,g=g, dist="binomial", classifier="Logistic", seed=seed)    
 
-    # Fit the transformed features
-    cl.fit(Xts, Ytrain)
+    # Perform Transform on Training Values
+    Xt  = model.forward_batch(Xtrain, 500, do_fit=False)
 
-    # Test the classifier
-    Xr = model.forward(Xtest)
-    scaler = SparseScaler()
-    Xr = scaler.fit_transform(Xr)
-    score = cl.score(Xr, Ytest)
+    # Train the classifier with the transformed input
+    model.fit_classifier(Xt, Ytrain)
+
+    # Perform Transform on Testing Values
+    Xt  = model.forward_batch(Xtest, 500, do_fit=False)
+
+    # Score the predictions
+    score = model.score(Xt, Ytest)
 
     return score
 
@@ -54,7 +50,9 @@ def load_dataset(dataset):
 if __name__ == "__main__":
 
     csv = pd.read_csv(CSV_PATH)
+    print(csv)
     csv["Hydra_Binomial"] = np.nan
+    csv["Hydra_Binomial_Var"] = np.nan
 
     if (sys.argv[1].lower() == 'all'):
 
@@ -66,6 +64,7 @@ if __name__ == "__main__":
             Xtrain, Xtest, Ytrain, Ytest = load_dataset(ds)
 
             best_score = 0.0
+            scores = []
             for i in range(BEST_OF): 
 
                 start = time.perf_counter()
@@ -73,11 +72,19 @@ if __name__ == "__main__":
                 score = training_round(Xtrain, Xtest, Ytrain, Ytest, 8, 8, seed=i)
                 print(f"Score for '{ds}': {100*score:0.02f} %") 	
 
+                scores.append(score)
+
                 best_score = max(best_score, score)
 
-                print(f"Execution of '{ds}' took {time.perf_counter()-start} seconds")
+                if(best_score > 0.9999):
+                    # If our accuracy is already at 100%, advance to the next DS.
+                    break
 
-            csv['Hydra_Binomial'][idx] = best_score
+                print(f"Execution of '{ds}' took {time.perf_counter()-start} seconds")
+            print(f"Dataset '{ds}': {np.max(scores)*100 : 0.02f} +/- {100*(np.max(scores)-np.min(scores)) : 0.02f}")
+
+            csv['Hydra_Binomial'][idx]     = best_score
+            csv['Hydra_Binomial_Var'][idx] = np.max(scores)-np.min(scores)
             csv.to_csv("./data/results_ours.csv", mode="w")
 
     else:

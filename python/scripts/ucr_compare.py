@@ -53,20 +53,34 @@ if __name__ == "__main__":
     # Append other relevant information
     csv_out['Input Length']     = np.nan
     csv_out['Training Samples'] = np.nan
+    csv_out['Output Classes']   = np.nan
+    csv_out['Outlen/Train']     = np.nan
+    csv_out['Imbalance']        = np.nan
 
     if(not os.path.exists("./data/ucr_props.bin")):
         props = {}
         print("First execution. It might take some time...")
 
         for idx,row in csv_out.iterrows():
-            X,_ = load_ucr_ds(row['dataset'], split="test", return_type="numpy2d")
-            input_len = X.shape[1]
-            numex_len = X.shape[0]
+            X,Y = load_ucr_ds(row['dataset'], split="test", return_type="numpy2d")
+            input_len  = X.shape[1]
+            numex_len  = X.shape[0]
+            output_cls = len(np.unique(Y))
+            
+            # Evaluate Histogram and Class Imbalance 
+            Y = Y.astype(np.uint8)
+            hist,_ = np.histogram(Y, bins=output_cls)
+            argmax,histmax  = np.argmax(hist), np.max(hist)
+            histmean = np.mean(sorted(hist)[:-1])
+
             with warnings.catch_warnings():
                 warnings.simplefilter(action='ignore')
                 csv_out['Input Length'][idx]     = input_len 
                 csv_out['Training Samples'][idx] = numex_len
-            props[row['dataset']] = {'input_len': input_len, 'numex_len': numex_len}
+                csv_out['Output Classes'][idx]   = output_cls
+                csv_out['Outlen/Train'][idx]     = numex_len/output_cls
+                csv_out['Imbalance'][idx]        = histmax/histmean
+            props[row['dataset']] = {'input_len': input_len, 'numex_len': numex_len, 'output_cls': output_cls, 'imbalance': histmax/histmean}
 
         with open(UCR_DATA_SET_FACTS, "wb") as f:
             pickle.dump(props, f)
@@ -79,6 +93,9 @@ if __name__ == "__main__":
                     warnings.simplefilter(action='ignore')
                     csv_out['Input Length'][idx]     = props[row['dataset']]['input_len']
                     csv_out['Training Samples'][idx] = props[row['dataset']]['numex_len']
+                    csv_out['Output Classes'][idx]   = props[row['dataset']]['output_cls']
+                    csv_out['Outlen/Train'][idx]     = props[row['dataset']]['output_cls']/props[row['dataset']]['numex_len']
+                    csv_out['Imbalance'][idx]        = props[row['dataset']]['imbalance']
 
     print(csv_out)
 
@@ -88,7 +105,6 @@ if __name__ == "__main__":
     plt.scatter(csv_out['Differences'], csv_out['Input Length'])
     plt.xlabel("Accuracy Deviation of nanoHydra")
     plt.ylabel("Input Sequence Length (in samples)")
-    plt.ylabel("# Datasets")
     plt.grid(True)
     plt.savefig("./data/fig2_dev_vs_input_len.png", dpi=200,  bbox_inches='tight')
     
@@ -110,6 +126,32 @@ if __name__ == "__main__":
     plt.grid(True)
     plt.savefig("./data/fig4_dev_vs_orig_acc.png",  dpi=200, bbox_inches='tight')
 
+    # Scatter plot of accuracy difference vs output length
+    plt.figure(5)
+    plt.title("nanoHydra Differences vs Output Length")
+    plt.scatter(csv_out['Differences'], csv_out['Output Classes'])
+    plt.xlabel("Accuracy Deviation of nanoHydra")
+    plt.ylabel("# Output Classes")
+    plt.grid(True)
+    plt.savefig("./data/fig5_dev_vs_orig_acc.png",  dpi=200, bbox_inches='tight')
+
+    # Scatter plot of accuracy difference vs output length / num training examples ratio
+    plt.figure(6)
+    plt.title("nanoHydra Differences vs Output Length")
+    plt.scatter(csv_out['Differences'], csv_out['Outlen/Train'])
+    plt.xlabel("Accuracy Deviation of nanoHydra")
+    plt.ylabel("# Output Classes /# Training examples")
+    plt.grid(True)
+    plt.savefig("./data/fig6_dev_vs_outtrain_rat.png",  dpi=200, bbox_inches='tight')
+
+    # Scatter plot of accuracy difference vs output length / num training examples ratio
+    plt.figure(7)
+    plt.title("nanoHydra Differences vs Output Length")
+    plt.scatter(csv_out['Differences'], csv_out['Imbalance'])
+    plt.xlabel("Accuracy Deviation of nanoHydra")
+    plt.ylabel("Class Imbalance Ratio")
+    plt.grid(True)
+    plt.savefig("./data/fig7_imbalance.png",  dpi=200, bbox_inches='tight')
     # Save to CSV
     csv_out.to_csv("./data/results_vs_data_props.csv")
 
