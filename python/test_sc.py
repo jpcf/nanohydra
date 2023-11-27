@@ -7,6 +7,7 @@ import sys
 import time
 from datetime import datetime as dt
 from nanohydra.hydra import NanoHydra
+from nanohydra.utils import vs_creator
 
 BATCH_TRAIN = True
 BATCH_SIZE  = 32
@@ -29,17 +30,12 @@ if __name__ == "__main__":
     Ytest  = Ytest.astype(np.int8)
 
     # Try One vs All training
-    #np.putmask(Ytrain, Ytrain > 10,  12)
-    #np.putmask(Ytrain, Ytrain < 11,   0)
-    #np.putmask(Ytrain, Ytrain > 0,    1)
-    #np.putmask(Ytest,   Ytest > 10,  12)
-    #np.putmask(Ytest,   Ytest < 11,   0)
-    #np.putmask(Ytest,   Ytest > 0,    1)
-    #np.putmask(Yval,     Yval > 10,  12)
-    #np.putmask(Yval,     Yval < 11,   0)
-    #np.putmask(Yval,     Yval > 0,    1)
-
+    print(np.unique(Ytrain))
+    vs_creator([Xtrain, Xtest], [Ytrain, Ytest], 11)
+    print(np.unique(Ytrain))
+    
     #Ytrain = np.hstack([Ytrain, Yval])
+
 
     # Plot Histograms for Class Membership of splits
     #plt.figure(1)
@@ -54,12 +50,10 @@ if __name__ == "__main__":
     plt.show()
 
     print(np.unique(Ytrain))
-    print(f"Training fold: {Xtrain.shape}")
-    print(f"Testing  fold: {Xtest.shape}")
     input_length = Xtrain.shape[1]
 
     # Initialize the kernel transformer, scaler and classifier
-    model  = NanoHydra(input_length=input_length, k=8, g=64, max_dilations=8, dist="binomial", classifier="Logistic", scaler="Sparse", seed=23981)    
+    model  = NanoHydra(input_length=input_length, k=8, g=64, max_dilations=16, dist="binomial", classifier="Logistic", scaler="Sparse", seed=23981)    
 
     # Transform and scale (load from cached)
     print(f"Transforming Train Fold...")
@@ -76,22 +70,21 @@ if __name__ == "__main__":
     # Test the classifier
     print(f"Transforming Test Fold...")
     Xtest = model.load_transform("SpeechCommands_300", "./work", "test")
-    Ypred = model.predict_batch(Xtest, 256, "predict")
+    Ypred = model.predict_batch(Xtest, 256)
     print(np.array(Ypred).shape)
     
     # Score the classifier
     score_man = model.score_manual(Ypred, Ytest, "subset")
-    score_f1  = f1_score(Ytest, Ypred)
     print(f"Score    for 'Speech Commands v0.0.3': {100*score_man:0.02f} %") 	
-    print(f"F1-Score for 'Speech Commands v0.0.3': {score_f1} ") 	
 
-    #score = model.score(Ypred, Ytest)
-    #print(f"Score for 'Speech Commands v0.0.3': {100*score:0.02f} %") 	
-    # Display confusion matrix
     cm = confusion_matrix(Ytest, Ypred, labels=model.cfg.get_classf().classes_)
     cmd = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.cfg.get_classf().classes_)
     cmd.plot()
     plt.show()
+
+    score_f1  = f1_score(Ytest, Ypred, average='weighted')
+    print(f"F1-Score for 'Speech Commands v0.0.3': {score_f1} ") 	
+
 
 
     with open(f"exec_{int(time.time())}.txt", "w") as f:

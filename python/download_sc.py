@@ -11,16 +11,16 @@ print(f"Shape of Ytest:  {Ytest.shape}")
 print(f"Shape of Xval:   {Xval.shape}")
 print(f"Shape of Yval:   {Yval.shape}")
 
-Xtrain = Xtrain.astype(np.float32)/(2**15)
-Xtest  = Xtest.astype(np.float32)/(2**15)
-Xval   = Xval.astype(np.float32)/(2**15)
+#Xtrain = Xtrain.astype(np.float32)/(2**15)
+#Xtest  = Xtest.astype(np.float32)/(2**15)
+#Xval   = Xval.astype(np.float32)/(2**15)
 Ytrain = Ytrain.astype(np.float32)
 Ytest  = Ytest.astype(np.float32)
 Yval   = Yval.astype(np.float32)
 input_length = Xtrain.shape[1]
 
 # Initialize the kernel transformer, scaler and classifier
-model  = NanoHydra(input_length=input_length, k=8, g=8, max_dilations=1, dist="binomial", classifier="Logistic", scaler="Sparse", seed=23981)    
+model  = NanoHydra(input_length=input_length, k=8, g=64, max_dilations=16, dist="binomial", classifier="Logistic", scaler="Sparse", seed=23981)    
 
 # Transforming Train Fold
 print(f"Transforming Train Fold...")
