@@ -6,6 +6,7 @@ from sklearn.neural_network           import MLPClassifier
 import h5py
 import os
 import gc
+from tqdm import tqdm
 
 import tensorflow.keras as tf
 from   tensorflow.keras           import Sequential, regularizers
@@ -66,7 +67,7 @@ class NanoHydraCfg():
                 tol=1e-4, 
                 learning_rate='adaptive', 
                 eta0=1e-3, 
-                n_iter_no_change=20
+                n_iter_no_change=5
             )
         elif(classifiertype.lower() == "ridge"):
             self.classf = RidgeClassifierCV(alphas=np.logspace(0,1,50), store_cv_values=True)
@@ -114,7 +115,7 @@ class NanoHydra():
 
     __KERNEL_LEN = 9
 
-    def __init__(self, input_length, k = 8, g = 64, max_dilations=8, seed = None, dist = "normal", classifier="Logistic", scaler="Sparse", dtype=np.int16, verbose=True, classifier_args=None):
+    def __init__(self, input_length, num_channels=1,  k = 8, g = 64, max_dilations=8, seed = None, dist = "normal", classifier="Logistic", scaler="Sparse", dtype=np.int16, verbose=True, classifier_args=None):
 
         self.cfg = NanoHydraCfg(seed= seed, scalertype=scaler, classifiertype=classifier, classifier_args=classifier_args)
         self.dist = dist
@@ -127,6 +128,7 @@ class NanoHydra():
 
         self.k = k # num kernels per group
         self.g = g # num groups
+        self.num_channels = num_channels
 
         max_exponent = np.log2((input_length - 1) / (self.__KERNEL_LEN - 1))
 
@@ -206,16 +208,11 @@ class NanoHydra():
     # transform in batches of *batch_size*
     def forward_batch(self, X, batch_size = 256, do_fit=True, Y=None):
         num_examples = X.shape[0]
+        len_feat_vec = 2*self.k * self.g * self.num_dilations * self.num_channels
+        Z = np.empty((num_examples, len_feat_vec))
 
-        for idx in range(0, num_examples, batch_size):
-            #if(self.verbose):
-            #    print(f"Range: {idx}:{min(idx+batch_size, num_examples)}")
-            Zt = self.forward(X[idx:min(idx+batch_size, num_examples)])
-
-            if(idx == 0):    
-                Z = Zt
-            else:
-                Z = np.vstack((Z, Zt))
+        for idx in tqdm(range(0, num_examples, batch_size)):
+            Z[idx:min(idx+batch_size, num_examples), :] = self.forward(X[idx:min(idx+batch_size, num_examples), :, :])
 
         if(do_fit):
             self.fit_scaler(Z)
@@ -229,54 +226,69 @@ class NanoHydra():
         num_examples = X.shape[0]
 
         if self.divisor > 1:
-            diff_X = np.diff(X, axis=1)
+            diff_X = np.diff(X, axis=2)
+        
+        # Making sure dimensions are coherent
+        assert diff_X.shape[0]==X.shape[0],   "DiffX {diff_X.shape[0]} and X {X.shape[0]} must have the same number of examples"
+        assert diff_X.shape[1]==X.shape[1],   "DiffX {diff_X.shape[1]} and X {X.shape[1]} must have the same number of channels"
+        assert diff_X.shape[2]==X.shape[2]-1, "DiffX {diff_X.shape[2]} and X {X.shape[2]} must have the same length-1"
 
         Z = []
 
-        for dilation_index in range(self.num_dilations):
+        for channel in range(self.num_channels):
+            Z_chan = []
+            
+            for dilation_index in range(self.num_dilations):
 
-            d = self.dilations[dilation_index]
+                d = self.dilations[dilation_index]
 
-            feats = [None for i in range(self.divisor)]
+                feats = [None for i in range(self.divisor)]
 
-            for diff_index in range(self.divisor):
+                for diff_index in range(self.divisor):
 
-                #print(f"Transforming {num_examples} input samples for dilation {d} and diff_idx {diff_index}")
+                    #print(f"Transforming {num_examples} input samples for dilation {d} and diff_idx {diff_index}")
+                    _X = X[:,channel,:] if diff_index == 0 else diff_X[:,channel,:]
+                    # Perform convolution on all kernels of a given dilation
+                    #print(f"Current Dilation: {d}")
+                    #_Z = conv1d_opt_x_int16_w_b1(_X, self.W[dilation_index, diff_index], dilation = d)
+                    _Z = conv1d_opt_x_f32_w_f32(_X, self.W[dilation_index, diff_index], dilation = d)
 
-                _X = X if diff_index == 0 else diff_X
-                # Perform convolution on all kernels of a given dilation
-                #print(f"Current Dilation: {d}")
-                _Z = conv1d_opt_x_int16_w_b1(_X, self.W[dilation_index, diff_index], dilation = d)
-                #_Z = conv1d_opt_x_f32_w_f32(_X, self.W[dilation_index, diff_index], dilation = d)
+                    # For each example, calculate the (arg)max/min over the k kernels of a given group.
+                    # Here we should "collapse" the second dimension of the tensor, where the kernel indices are.
+                    # Both return vectors should have dimensions (num_examples, num_groups, input_len)
+                    max_values, max_indices = np.max(_Z, axis=2).astype(np.float32), np.argmax(_Z, axis=2).astype(np.uint32)
+                    min_values, min_indices = np.min(_Z, axis=2).astype(np.float32), np.argmin(_Z, axis=2).astype(np.uint32)
 
-                # For each example, calculate the (arg)max/min over the k kernels of a given group.
-                # Here we should "collapse" the second dimension of the tensor, where the kernel indices are.
-                # Both return vectors should have dimensions (num_examples, num_groups, input_len)
-                max_values, max_indices = np.max(_Z, axis=2).astype(np.float32), np.argmax(_Z, axis=2).astype(np.uint32)
-                min_values, min_indices = np.min(_Z, axis=2).astype(np.float32), np.argmin(_Z, axis=2).astype(np.uint32)
+                    # Create a feature vector of size (num_groups, num_kernels) where each of the num_kernels position contains
+                    # the count for the respective kernel with that index.
+                    feats_hard_max = soft_counting_opt(max_indices, max_values, kernels_per_group=self.k)
+                    feats_hard_min = hard_counting_opt(min_indices, kernels_per_group=self.k)
 
-                # Create a feature vector of size (num_groups, num_kernels) where each of the num_kernels position contains
-                # the count for the respective kernel with that index.
-                feats_hard_max = soft_counting_opt(max_indices, max_values, kernels_per_group=self.k)
-                feats_hard_min = hard_counting_opt(min_indices, kernels_per_group=self.k)
+                    feats_hard_max = feats_hard_max.reshape((num_examples, self.h*self.k))
+                    feats_hard_min = feats_hard_min.reshape((num_examples, self.h*self.k))
 
-                feats_hard_max = feats_hard_max.reshape((num_examples, self.h*self.k))
-                feats_hard_min = feats_hard_min.reshape((num_examples, self.h*self.k))
+                    feats[diff_index] = np.concatenate((feats_hard_max, feats_hard_min), axis=1)
 
-                feats[diff_index] = np.concatenate((feats_hard_max, feats_hard_min), axis=1)
+                feats = np.concatenate((feats[0], feats[1]), axis=1)
 
-            feats = np.concatenate((feats[0], feats[1]), axis=1)
-
-            if(dilation_index):
-                Z = np.concatenate((Z,feats), axis=1)
+                if(dilation_index):
+                    Z_chan = np.concatenate((Z_chan,feats), axis=1)
+                else:
+                    Z_chan = feats
+            if(channel):
+                Z = np.concatenate((Z,Z_chan), axis=1)
             else:
-                Z = feats
+                Z = Z_chan
+
+        num_feats = 2*self.k * self.g * self.num_dilations * self.num_channels
+        assert len(Z[0]) == num_feats, f"Dimensions of feature vector ({len(Z[0])}) do not match expected features {num_feats}"
 
         # Immediately free up RAM by marking the large vectors for deletion and calling the GC.
         del X
         del diff_X
         del _X
         del feats
+        del Z_chan
         gc.collect()
 
         return Z

@@ -7,7 +7,7 @@ import sys
 import time
 from nanohydra.hydra import NanoHydra
 
-DATASETS        = ["Phoneme"]
+DATASETS        = ["ECG5000"]
 SHOW_HISTOGRAMS = True
 SHOW_CONFMATRIX = True
 SHOW_EXAMPLES   = False
@@ -31,7 +31,7 @@ if __name__ == "__main__":
         
         # Fetch the dataset
         for sp in ["test", "train"]:
-            X[sp][ds],y[sp][ds]  = load_ucr_ds(ds, split=sp, return_type="numpy2d")
+            X[sp][ds],y[sp][ds]  = load_ucr_ds(ds, split=sp, return_type="numpy3d")
 
         Ns = min(X['test'][ds].shape[0], num_ex)
 
@@ -45,7 +45,7 @@ if __name__ == "__main__":
         print(f"Training fold: {Xtrain.shape}")
         print(f"Testing  fold: {Xtest.shape}")
 
-        input_length = Xtrain.shape[1]
+        input_length = Xtrain.shape[0]
 
         # Display Histograms
         if(SHOW_HISTOGRAMS):
@@ -73,13 +73,13 @@ if __name__ == "__main__":
                 
 
         # Initialize the kernel transformer, scaler and classifier
-        model  = NanoHydra(input_length=input_length, k=8, g=64, max_dilations=10, dist="binomial", classifier="Logistic", scaler="Sparse", seed=int(time.time()), dtype=np.float32, verbose=False)    
+        model  = NanoHydra(input_length=input_length, num_channels=1, k=8, g=64, max_dilations=10, dist="binomial", classifier="Logistic", scaler="Sparse", seed=int(time.time()), dtype=np.float32, verbose=False)    
 
         # Transform and scale
         print(f"Transforming {Xtrain.shape[0]} training examples...")
         Xt = model.load_transform(ds, "./work", "train") 
         if(Xt is None or not USE_CACHED):
-            Xt  = model.forward_batch(Xtrain, Xtrain.shape[1], do_fit=True)
+            Xt  = model.forward_batch(Xtrain, 100, do_fit=True)
             model.save_transform(Xt, ds, "./work", "train")
         else:
             print("Using cached transform...")
@@ -130,6 +130,7 @@ if __name__ == "__main__":
 
         if(DO_PCA):
             Xt = PCATransf.transform(Xt)
+
         Ypred = model.predict_batch(Xt, 100)
         print(f"Ypred shape: {Ypred.shape}")
         score_man = model.score_manual(Ypred, Ytest, "subset")
