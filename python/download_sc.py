@@ -20,11 +20,11 @@ Yval   = Yval.astype(np.float32)
 input_length = Xtrain.shape[1]
 
 # Initialize the kernel transformer, scaler and classifier
-model  = NanoHydra(input_length=input_length, k=8, g=64, max_dilations=16, dist="binomial", classifier="Logistic", scaler="Sparse", seed=23981)    
+model  = NanoHydra(input_length=input_length, k=8, g=64, max_dilations=10, dist="binomial", classifier="Logistic", scaler="Sparse", seed=23981)    
 
 # Transforming Train Fold
 print(f"Transforming Train Fold...")
-Xtr  = model.forward_batch(Xtrain, 250, do_fit=False)
+Xtr  = model.forward_batch(Xtrain, 250, do_fit=True)
 model.save_transform(Xtr, "SpeechCommands_300", "./work", "train")
 print(f"Transforming Test Fold...")
 Xts  = model.forward_batch(Xtest, 250, do_fit=False)

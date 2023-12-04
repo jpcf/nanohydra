@@ -1,10 +1,14 @@
 from sktime.datasets                     import load_UCR_UEA_dataset as load_ucr_ds
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, f1_score
+from sklearn.model_selection import PredefinedSplit
 import matplotlib.pyplot as plt
 import tensorflow_datasets as tfds
+import tensorflow as tf
 import numpy as np
 import sys
 import time
+import pickle
+
 from datetime import datetime as dt
 from nanohydra.hydra import NanoHydra
 from nanohydra.utils import vs_creator
@@ -21,60 +25,56 @@ if __name__ == "__main__":
 
     (Xtrain, Ytrain), (Xtest, Ytest), (Xval, Yval) = tfds.as_numpy(tfds.load('speech_commands', split=['train', 'test', 'validation'], batch_size=-1, as_supervised=True))
 
-    # The split argument splits into the opposite fold. Therefore, we here cross them back
-    # together into the correct one.
-
-    Xtrain = Xtrain.astype(np.float32)/(2**15)
-    Xtest  = Xtest.astype(np.float32)/(2**15)
     Ytrain = Ytrain.astype(np.int8)
     Ytest  = Ytest.astype(np.int8)
-
-    # Try One vs All training
-    print(np.unique(Ytrain))
-    vs_creator([Xtrain, Xtest], [Ytrain, Ytest], 11)
-    print(np.unique(Ytrain))
-    
-    #Ytrain = np.hstack([Ytrain, Yval])
-
-
-    # Plot Histograms for Class Membership of splits
-    #plt.figure(1)
-    #plt.hist(Ytrain)
-    #plt.title("Histogram of Class Distrs in TRAIN")
-    #plt.figure(3)
-    #plt.hist(Ytest)
-    #plt.title("Histogram of Class Distrs in TEST (AFTER)")
-    #plt.figure(3)
-    #plt.hist(Yval)
-    #plt.title("Histogram of Class Distrs in VAL")
-    plt.show()
-
-    print(np.unique(Ytrain))
-    input_length = Xtrain.shape[1]
+    Yval   = Yval.astype(np.int8)
 
     # Initialize the kernel transformer, scaler and classifier
-    model  = NanoHydra(input_length=input_length, k=8, g=64, max_dilations=16, dist="binomial", classifier="Logistic", scaler="Sparse", seed=23981)    
+    model  = NanoHydra(input_length=Xtrain.shape[1], k=8, g=64, max_dilations=10, dist="binomial", classifier="Logistic", scaler="Sparse", seed=23981, classifier_args={'cv': None})    
 
-    # Transform and scale (load from cached)
-    print(f"Transforming Train Fold...")
-    Xtrain = model.load_transform("SpeechCommands_300", "./work", "train")
-    Xval = model.load_transform("SpeechCommands_300", "./work", "val")
+    # Load the Dataset
+    print(f"Loading the dataset")
+    Xtrain = model.load_transform("SpeechCommands_300", "./work", "train")[:,:5000]
+    Xval = model.load_transform("SpeechCommands_300", "./work", "val")[:,:5000]
+    Xtest = model.load_transform("SpeechCommands_300", "./work", "test")[:,:5000]
 
-    #Xtrain = np.vstack([Xtrain, Xval])
+    print(f"Ytrain={Ytrain[0]}")
+    for i in range(30):
+       print(f"test[{i}]={Yval[i]}")
 
-    print(f"Shape of Training Fold: {Xtrain.shape}")
+    plt.figure()
+    plt.plot(Xtrain[6], label="Xtrain")
+    plt.plot(Xval[22],  label="Xtest")
+    plt.legend()
+    plt.show()
+
+    print(f"Shape of Training   Fold: {Xtrain.shape}")
+    print(f"Shape of Validation Fold: {Xval.shape}")
+    print(f"Shape of Testing    Fold: {Xtest.shape}")
+    print(f"Shape of Training Y Fold: {Ytrain.shape}")
+    print(f"Shape of Validatio Y Fold: {Yval.shape}")
+    #print(f"Class labels : {np.unique(Ytrain)}")
+
+    # Prepare the Train+Val split
+    #val_split_idx = [-1]*len(Xtrain) + [0]*len(Xval)
+    #X = np.concatenate((Xtrain, Xval), axis=0)
+    #Y = np.concatenate((Ytrain, Yval), axis=0)
+    #val_split = PredefinedSplit(test_fold=val_split_idx)
+    #print(f"Shape of Train+Val Fold: X={X.shape}, Y={Y.shape}")
+
+    # Initialize the kernel transformer, scaler and classifier
+    model  = NanoHydra(input_length=Xtrain.shape[1], k=8, g=64, max_dilations=10, dist="binomial", classifier="Logistic", scaler="Sparse", seed=23981)    
 
     # Train the classifier
+    #model.fit_tf_classifier(Xtrain, Ytrain, Xval, Yval)
     model.fit_classifier(Xtrain, Ytrain)
 
-    # Test the classifier
-    print(f"Transforming Test Fold...")
-    Xtest = model.load_transform("SpeechCommands_300", "./work", "test")
-    Ypred = model.predict_batch(Xtest, 256)
-    print(np.array(Ypred).shape)
+    # Perform Predictions  
+    #Ypred = model.predict_tf(Xtest)
+    Ypred = model.predict(Xtest)
     
     # Score the classifier
-    score_man = model.score_manual(Ypred, Ytest, "subset")
+    score_man = model.score_manual(Ypred, Ytest, "prob")
     print(f"Score    for 'Speech Commands v0.0.3': {100*score_man:0.02f} %") 	
 
     cm = confusion_matrix(Ytest, Ypred, labels=model.cfg.get_classf().classes_)
@@ -85,9 +85,10 @@ if __name__ == "__main__":
     score_f1  = f1_score(Ytest, Ypred, average='weighted')
     print(f"F1-Score for 'Speech Commands v0.0.3': {score_f1} ") 	
 
-
-
     with open(f"exec_{int(time.time())}.txt", "w") as f:
         f.write(f"[{dt.now()}] Score for 'Speech Commands v0.0.3': {100*score_man:0.02f} %")
+
+    with open(f"model_checkpoint_{int(time.time())}.bin", "wb") as f:
+        pickle.dump(model.cfg.get_classf(), f) 
 
     print(f"Execution of examples took {time.perf_counter()-start} seconds")

@@ -1,18 +1,21 @@
 from sktime.datasets                     import load_UCR_UEA_dataset as load_ucr_ds
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, f1_score
+from sklearn.decomposition import PCA
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
 import time
 from nanohydra.hydra import NanoHydra
 
-DATASETS        = ["ECG5000"]
+DATASETS        = ["Phoneme"]
 SHOW_HISTOGRAMS = True
 SHOW_CONFMATRIX = True
-SHOW_EXAMPLES   = True
+SHOW_EXAMPLES   = False
 SHOW_TRANSFORM  = True
+SHOW_COLI_MEAS  = False
 USE_CACHED      = False
-SHOW_ALPHAS_RR  = True
+SHOW_ALPHAS_RR  = False
+DO_PCA          = False
 
 X  = {'test': {}, 'train': {}}
 y  = {'test': {}, 'train': {}}
@@ -60,22 +63,23 @@ if __name__ == "__main__":
 
         if(SHOW_EXAMPLES):
             plt.figure(3)
-            for c in np.unique(Ytest):
-                idx = 0
-                while(Ytrain[idx] != c):
-                    idx += 1
-                plt.plot(Xtrain[idx], label=f"Class {c}")
+            plt.plot(Xtrain[0])
+            #for c in np.unique(Ytest):
+            #    idx = 0
+            #    while(Ytrain[idx] != c):
+            #        idx += 1
+            #    plt.plot(Xtrain[idx], label=f"Class {c}")
             plt.legend()
                 
 
         # Initialize the kernel transformer, scaler and classifier
-        model  = NanoHydra(input_length=input_length, k=8, g=8, max_dilations=5, dist="binomial", classifier="Ridge", scaler="Sparse", seed=int(time.time()), dtype=np.float32, verbose=False)    
+        model  = NanoHydra(input_length=input_length, k=8, g=64, max_dilations=10, dist="binomial", classifier="Logistic", scaler="Sparse", seed=int(time.time()), dtype=np.float32, verbose=False)    
 
         # Transform and scale
         print(f"Transforming {Xtrain.shape[0]} training examples...")
         Xt = model.load_transform(ds, "./work", "train") 
         if(Xt is None or not USE_CACHED):
-            Xt  = model.forward_batch(Xtrain, Xt.shape[1], do_fit=False)
+            Xt  = model.forward_batch(Xtrain, Xtrain.shape[1], do_fit=True)
             model.save_transform(Xt, ds, "./work", "train")
         else:
             print("Using cached transform...")
@@ -83,9 +87,8 @@ if __name__ == "__main__":
 
         if(SHOW_TRANSFORM):
             plt.figure(5)
-            plt.imshow(Xt)
+            plt.imshow(Xt, vmin=np.min(Xt), vmax=np.max(Xt))
             plt.title(f"Transformed Training Set (Full, Not Shuffled)")
-                 
 
             # Display Training 10 Examples per class
             idxs = Ytrain.astype(np.float32).argsort()
@@ -102,6 +105,18 @@ if __name__ == "__main__":
                 ax.axhline(y, color='r', linestyle='-')
             plt.title(f"Transformed Training Set (Ordered by classes)")
 
+        if(SHOW_COLI_MEAS):
+            print(f"Condition Number for the Design Matrix (Transf Features): k={np.linalg.cond(np.hstack([np.ones((Xt.shape[0],1)), Xt]), p=2)}")
+
+        if(DO_PCA):
+            prev_dim = Xt.shape[1]
+            PCATransf = PCA(n_components='mle')
+            PCATransf.fit(Xt)
+            Xt = PCATransf.transform(Xt)
+            assert Xt.shape[1] < prev_dim, f"PCA did not reduce dimensionality ({Xt.shape[1]} vs. {prev_dim})"
+            print(f"New Dimensionality = {Xt.shape[1]} (Reduc. Ratio = { Xt.shape[1]/prev_dim:.2f}")
+
+        # Fit the classifier
         model.fit_classifier(Xt, Ytrain)
 
         # Test the classifier
@@ -112,6 +127,9 @@ if __name__ == "__main__":
             model.save_transform(Xt, ds, "./work", "test")
         else:
             print("Using cached transform...")
+
+        if(DO_PCA):
+            Xt = PCATransf.transform(Xt)
         Ypred = model.predict_batch(Xt, 100)
         print(f"Ypred shape: {Ypred.shape}")
         score_man = model.score_manual(Ypred, Ytest, "subset")
