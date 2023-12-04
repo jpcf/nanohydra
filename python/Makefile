@@ -45,3 +45,6 @@ test_speech_commands:
 # Testing
 test_conv1d:
 	$(PYTHONPATH) test_conv_fn_equivalence.py
+
+test_scaler:
+	$(PYTHONPATH) test_scaler.py

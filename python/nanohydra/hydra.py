@@ -1,12 +1,20 @@
 import time
 import numpy as np
-from sklearn.linear_model             import RidgeClassifierCV, SGDClassifier
+from sklearn.linear_model             import RidgeClassifierCV, SGDClassifier, LogisticRegressionCV
 from sklearn.tree                     import DecisionTreeClassifier, ExtraTreeClassifier
 from sklearn.neural_network           import MLPClassifier
 import h5py
 import os
+import gc
+
+import tensorflow.keras as tf
+from   tensorflow.keras           import Sequential, regularizers
+from   tensorflow.keras.layers    import Dense, Flatten
+from   tensorflow.keras.callbacks import EarlyStopping
+from   tensorflow.keras.losses    import SparseCategoricalCrossentropy
 
 from .optimized_fns.conv1d_opt_x_f32_w_f32        import conv1d_opt_x_f32_w_f32
+from .optimized_fns.conv1d_opt_x_int16_w_b1       import conv1d_opt_x_int16_w_b1
 from .optimized_fns.hard_counting_opt import hard_counting_opt
 from .optimized_fns.soft_counting_opt import soft_counting_opt
 
@@ -22,6 +30,31 @@ class NanoHydraCfg():
 
         # Define Classifier
         if(classifiertype.lower() == "logistic"):
+
+            #self.classf = Sequential([
+            #    Flatten(input_shape=(5000,1)),
+            #    Dense(12, activation='softmax', kernel_regularizer=regularizers.l2(1e-4))
+            #])
+            #self.classf.compile(
+            #    optimizer='adam',
+            #    loss=SparseCategoricalCrossentropy(),
+            #    metrics='accuracy'
+            #)
+            #self.classf.build()
+            #self.classf.summary()
+            # Alternative 2: LR with SAGA 
+            #self.classf = LogisticRegressionCV(
+            #        penalty="l2",
+            #        Cs = [1, 10, 100, ],
+            #        cv=classifier_args['cv'],
+            #        class_weight= 'balanced',
+            #        solver='saga',
+            #        multi_class='multinomial',
+            #        verbose=1,
+            #        max_iter=100,
+            #        n_jobs=22,
+            #        )
+            # Alternative 1: SGD Classifier
             self.classf = SGDClassifier(
                 loss='log_loss', 
                 alpha=0.001, 
@@ -29,14 +62,14 @@ class NanoHydraCfg():
                 class_weight="balanced", 
                 shuffle=True, 
                 n_jobs=22, 
-                verbose=0, 
+                verbose=1, 
                 tol=1e-4, 
                 learning_rate='adaptive', 
                 eta0=1e-3, 
                 n_iter_no_change=20
             )
         elif(classifiertype.lower() == "ridge"):
-            self.classf = RidgeClassifierCV(alphas=np.logspace(-3,3,10))
+            self.classf = RidgeClassifierCV(alphas=np.logspace(0,1,50), store_cv_values=True)
         elif(classifiertype.lower() == "perceptron"):
             self.classf = SGDClassifier(
                 loss='perceptron', 
@@ -81,12 +114,14 @@ class NanoHydra():
 
     __KERNEL_LEN = 9
 
-    def __init__(self, input_length, k = 8, g = 64, max_dilations=8, seed = None, dist = "normal", classifier="Logistic", scaler="Sparse"):
+    def __init__(self, input_length, k = 8, g = 64, max_dilations=8, seed = None, dist = "normal", classifier="Logistic", scaler="Sparse", dtype=np.int16, verbose=True, classifier_args=None):
 
-        self.cfg = NanoHydraCfg(seed= seed, scalertype=scaler, classifiertype=classifier)
+        self.cfg = NanoHydraCfg(seed= seed, scalertype=scaler, classifiertype=classifier, classifier_args=classifier_args)
         self.dist = dist
         self.input_length = input_length
         self.classifier = classifier
+        self.dtype = dtype
+        self.verbose = verbose
 
         self.__set_seed(self.cfg.get_seed())
 
@@ -105,13 +140,13 @@ class NanoHydra():
         self.h = self.g // self.divisor
 
         if(dist == "normal"):
-            self.W = self.rng.standard_normal(size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN)).astype(np.float32)
+            self.W = self.rng.standard_normal(size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN)).astype(self.dtype)
             self.W = self.W - np.mean(self.W)
             self.W = self.W / np.sum(np.abs(self.W))
         elif(dist == "binomial"):
-            self.W = self.rng.choice([-1, 1], size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN), p=[0.5, 0.5]).astype(np.float32)
+            self.W = self.rng.choice([-1, 1], size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN), p=[0.5, 0.5]).astype(self.dtype)
         elif(dist == "tetranomial"):
-            self.W = self.rng.choice([-2, -1, 1, 2], size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN), p=[0.1, 0.4, 0.4, 0.1]).astype(np.float32)
+            self.W = self.rng.choice([-2, -1, 1, 2], size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN), p=[0.1, 0.4, 0.4, 0.1]).astype(self.dtype)
 
         # Preliminary message with model dimensions
         self.evaluate_model_size()
@@ -172,22 +207,22 @@ class NanoHydra():
     def forward_batch(self, X, batch_size = 256, do_fit=True, Y=None):
         num_examples = X.shape[0]
 
-        Z = []
         for idx in range(0, num_examples, batch_size):
-            #print(f"Range: {idx}:{min(idx+batch_size, num_examples)}")
+            #if(self.verbose):
+            #    print(f"Range: {idx}:{min(idx+batch_size, num_examples)}")
             Zt = self.forward(X[idx:min(idx+batch_size, num_examples)])
-            self.fit_scaler(Zt)
-            Zs = self.forward_scaler(Zt)
 
-            if(do_fit):
-                if(idx==0):
-                    self.cfg.get_classf().partial_fit(Zs, Y[idx:min(idx+batch_size, num_examples)], np.unique(Y))
-                else:
-                    self.cfg.get_classf().partial_fit(Zs, Y[idx:min(idx+batch_size, num_examples)])
+            if(idx == 0):    
+                Z = Zt
             else:
-                Z.append(Zs)
-        if(not do_fit):
-            return np.vstack(Z)
+                Z = np.vstack((Z, Zt))
+
+        if(do_fit):
+            self.fit_scaler(Z)
+
+        Z = self.forward_scaler(Z)
+
+        return Z
 
     def forward(self, X):
 
@@ -211,14 +246,15 @@ class NanoHydra():
                 _X = X if diff_index == 0 else diff_X
                 # Perform convolution on all kernels of a given dilation
                 #print(f"Current Dilation: {d}")
-                _Z = conv1d_opt_orig(_X, self.W[dilation_index, diff_index], dilation = d)
+                _Z = conv1d_opt_x_int16_w_b1(_X, self.W[dilation_index, diff_index], dilation = d)
+                #_Z = conv1d_opt_x_f32_w_f32(_X, self.W[dilation_index, diff_index], dilation = d)
 
                 # For each example, calculate the (arg)max/min over the k kernels of a given group.
                 # Here we should "collapse" the second dimension of the tensor, where the kernel indices are.
                 # Both return vectors should have dimensions (num_examples, num_groups, input_len)
                 max_values, max_indices = np.max(_Z, axis=2).astype(np.float32), np.argmax(_Z, axis=2).astype(np.uint32)
                 min_values, min_indices = np.min(_Z, axis=2).astype(np.float32), np.argmin(_Z, axis=2).astype(np.uint32)
-                
+
                 # Create a feature vector of size (num_groups, num_kernels) where each of the num_kernels position contains
                 # the count for the respective kernel with that index.
                 feats_hard_max = soft_counting_opt(max_indices, max_values, kernels_per_group=self.k)
@@ -230,11 +266,18 @@ class NanoHydra():
                 feats[diff_index] = np.concatenate((feats_hard_max, feats_hard_min), axis=1)
 
             feats = np.concatenate((feats[0], feats[1]), axis=1)
-            
+
             if(dilation_index):
                 Z = np.concatenate((Z,feats), axis=1)
             else:
                 Z = feats
+
+        # Immediately free up RAM by marking the large vectors for deletion and calling the GC.
+        del X
+        del diff_X
+        del _X
+        del feats
+        gc.collect()
 
         return Z
 
@@ -268,6 +311,19 @@ class NanoHydra():
     def fit_classifier(self, X, Y):
         self.cfg.get_classf().fit(X,Y)
 
+    def fit_tf_classifier(self, X, Y, X_val, Y_val):
+        early_stopping_cb = EarlyStopping(monitor='val_loss', mode='min', patience=50, restore_best_weights=True)
+        self.history = self.cfg.get_classf().fit(X, Y, 
+                                        epochs=100, 
+                                        batch_size=64, 
+                                        shuffle=1, 
+                                        verbose=True, 
+                                        validation_data=(X_val, Y_val),
+                                        callbacks=[early_stopping_cb])
+
+    def predict_tf(self, X):
+        return self.cfg.get_classf().predict(X, verbose=1, use_multiprocessing=True)
+
     def predict_batch(self, X, batch_size = 256):
         num_examples = X.shape[0]
         Y = []
@@ -282,9 +338,8 @@ class NanoHydra():
         # If Ypred are probs, first calculate Top-One
         if(method.lower() == "prob"):
             Ypred = np.argmax(Ypred, axis=1)
-
-        if(method.lower() == "subset"):
-            return np.sum(Ypred == Ytest)/len(Ypred)
+        
+        return np.sum(Ypred == Ytest)/len(Ypred)
 
     def score(self, X, Y):
         return self.cfg.get_classf().score(X,Y)
@@ -304,11 +359,15 @@ class SparseScaler():
 
         # Since X has dimensions (num_examples, num_features), we perform the operations 
         # on each example (feature vector). Therefore, from here on we perform operations on axis=1
-        #self.epsilon = (X == 0).float().mean(0) ** self.exponent + 1e-8
+        self.epsilon = np.mean((X == 0), axis=0) ** self.exponent + 1e-8
 
-        self.mu = np.mean(X, axis=1).reshape(X.shape[0], 1)
-        self.sigma = np.std(X, axis=1).reshape(X.shape[0], 1) #+ self.epsilon
 
+        self.mu = np.mean(X, axis=0)
+        self.sigma = np.std(X, axis=0) + self.epsilon
+
+        assert len(self.mu)    == X.shape[1], f"Scaling Vector *mean* is not the same length as the number of features {X.shape[1]}"
+        assert len(self.sigma) == X.shape[1], f"Scaling Vector *sigm* is not the same length as the number of features {X.shape[1]}"
+        
         self.fitted = True
 
     def transform(self, X):
@@ -317,11 +376,21 @@ class SparseScaler():
 
         X = np.sqrt(np.clip(X, a_min=0, a_max=None))
 
+        self.epsilon = np.mean((X == 0), axis=0) ** self.exponent + 1e-8
+        print(f"self.epsilon: {self.epsilon}")
+
         if self.mask:
-            #return ((X - self.mu) * (X != 0)) / self.sigma
-            return ((X - self.mu) ) / self.sigma
-        else:
-            return (X - self.mu) / self.sigma
+            
+            print(f"Shape of X  = {X.shape}")
+            print(f"Shape of m  = {self.mu.shape}")
+            print(f"Shape of s  = {self.sigma.shape}")
+            
+            for col in range(X.shape[1]):
+                X[:,col] = (X[:,col] - self.mu[col])*(X[:,col] != 0)
+            for col in range(X.shape[1]):
+                X[:,col] = X[:,col] / self.sigma[col]
+
+            return X
 
     def fit_transform(self, X):
 
