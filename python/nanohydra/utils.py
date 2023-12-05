@@ -22,7 +22,7 @@ def vs_creator(X, Y, class_to_elim, method="onevsall"):
 
 def transform_mfcc(X, fs=16000):
     BATCH_SZ = 500
-    N_MFCC = 10
+    N_MFCC = 6
     for i in tqdm(range(0, int(X.shape[0]/BATCH_SZ)+1, 1)):
         _X = mfcc(y=X[i*BATCH_SZ: (i+1)*BATCH_SZ,:], sr=fs, n_mfcc=N_MFCC, n_fft=512, hop_length=128, win_length=512, window=hann)
     
@@ -48,3 +48,42 @@ def show_mfcc(X_mfcc, classes):
         ax[i].set(title=f"Class {classes[i]}")
         fig.colorbar(img, ax=[ax[i]])
     plt.show()
+
+
+def get_idx_of_class(Y, label):
+    return np.argwhere(Y == label).flatten()
+
+
+def augment_data_of_class(X, Xbackground, factor):
+    # Fixed params
+    FS = 16000
+
+    # Variable Params
+    MAX_SHIFT = 0.2
+    MAX_BACKGROUND_VOL = 1
+
+    # Calculable params
+    LEN_BACKGROUND_SAMPLES = len(Xbackground)
+    LEN_CLASS_SAMPLES = len(X)
+    LEN_AUG_SAMPLES   = LEN_CLASS_SAMPLES*(factor-1)
+
+    # Pre-allocate space for augmented samples
+    Xaug = np.empty((LEN_AUG_SAMPLES, FS))
+
+    itercnt = 0
+    for idx in tqdm(range(LEN_CLASS_SAMPLES)):
+        for f in range(factor-1):
+            shift = int(np.random.uniform(-MAX_SHIFT, MAX_SHIFT) * FS)
+            if(shift < 0):
+                Xshift = np.concatenate([np.zeros(-shift), X[idx,-shift:]])
+            elif(shift > 0):
+                Xshift = np.concatenate([X[idx,:-shift], np.zeros(shift)])
+            else:
+                Xshift = X[idx,:]
+            assert Xshift.shape[0] == X.shape[1], f"The shifted vector has an incorrect number of samples"
+            Xaug[idx*(factor-1) + f,:] = Xshift + np.random.uniform(0, MAX_BACKGROUND_VOL) * Xbackground[np.random.choice(LEN_BACKGROUND_SAMPLES),:]
+            itercnt += 1
+    
+    assert itercnt == LEN_AUG_SAMPLES, f"Not all augmented data positions were calculated ({itercnt} vs {LEN_AUG_SAMPLES})"
+
+    return Xaug

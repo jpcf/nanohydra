@@ -33,7 +33,7 @@ class NanoHydraCfg():
         if(classifiertype.lower() == "logistic"):
 
             #self.classf = Sequential([
-            #    Flatten(input_shape=(5000,1)),
+            #    Flatten(input_shape=(6000,1)),
             #    Dense(12, activation='softmax', kernel_regularizer=regularizers.l2(1e-4))
             #])
             #self.classf.compile(
@@ -52,7 +52,7 @@ class NanoHydraCfg():
             #        solver='saga',
             #        multi_class='multinomial',
             #        verbose=1,
-            #        max_iter=100,
+            #        max_iter=200,
             #        n_jobs=22,
             #        )
             # Alternative 1: SGD Classifier

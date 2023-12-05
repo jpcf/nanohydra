@@ -30,13 +30,13 @@ if __name__ == "__main__":
     Yval   = Yval.astype(np.int8)
 
     # Initialize the kernel transformer, scaler and classifier
-    model  = NanoHydra(input_length=Xtrain.shape[1], k=8, g=64, max_dilations=10, dist="binomial", classifier="Logistic", scaler="Sparse", seed=23981, classifier_args={'cv': None})    
+    model  = NanoHydra(input_length=Xtrain.shape[1], num_channels=6, k=8, g=48, max_dilations=3, dist="binomial", classifier="Logistic", scaler="Sparse", seed=23981, classifier_args={'cv': None})    
 
     # Load the Dataset
     print(f"Loading the dataset")
-    Xtrain = model.load_transform("SpeechCommands_300", "./work", "train")[:,:5000]
-    Xval = model.load_transform("SpeechCommands_300", "./work", "val")[:,:5000]
-    Xtest = model.load_transform("SpeechCommands_300", "./work", "test")[:,:5000]
+    Xtrain = model.load_transform("SpeechCommands_300", "./work", "train")
+    Xval = model.load_transform("SpeechCommands_300", "./work", "val")
+    Xtest = model.load_transform("SpeechCommands_300", "./work", "test")
 
     print(f"Ytrain={Ytrain[0]}")
     for i in range(30):
@@ -56,14 +56,15 @@ if __name__ == "__main__":
     #print(f"Class labels : {np.unique(Ytrain)}")
 
     # Prepare the Train+Val split
-    #val_split_idx = [-1]*len(Xtrain) + [0]*len(Xval)
-    #X = np.concatenate((Xtrain, Xval), axis=0)
-    #Y = np.concatenate((Ytrain, Yval), axis=0)
-    #val_split = PredefinedSplit(test_fold=val_split_idx)
-    #print(f"Shape of Train+Val Fold: X={X.shape}, Y={Y.shape}")
+    val_split_idx = [-1]*len(Xtrain) + [0]*len(Xval)
+    X = np.concatenate((Xtrain, Xval), axis=0)
+    Y = np.concatenate((Ytrain, Yval), axis=0)
+    val_split = PredefinedSplit(test_fold=val_split_idx)
+    print(f"Shape of Train+Val Fold: X={X.shape}, Y={Y.shape}")
+    classifier_args={'cv': val_split}
 
     # Initialize the kernel transformer, scaler and classifier
-    model  = NanoHydra(input_length=Xtrain.shape[1], k=8, g=64, max_dilations=10, dist="binomial", classifier="Logistic", scaler="Sparse", seed=23981)    
+    model  = NanoHydra(input_length=Xtrain.shape[1], num_channels=6, k=8, g=48, max_dilations=3, dist="binomial", classifier="Logistic", scaler="Sparse", seed=23981, classifier_args=classifier_args)    
 
     # Train the classifier
     #model.fit_tf_classifier(Xtrain, Ytrain, Xval, Yval)
@@ -71,13 +72,15 @@ if __name__ == "__main__":
 
     # Perform Predictions  
     #Ypred = model.predict_tf(Xtest)
-    Ypred = model.predict(Xtest)
+    Ypred = model.predict_batch(Xtest, 256)
     
     # Score the classifier
-    score_man = model.score_manual(Ypred, Ytest, "prob")
+    score_man = model.score_manual(Ypred, Ytest, "subset")
     print(f"Score    for 'Speech Commands v0.0.3': {100*score_man:0.02f} %") 	
 
     cm = confusion_matrix(Ytest, Ypred, labels=model.cfg.get_classf().classes_)
+    # Show accuracy instead of abs count of samples
+    cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
     cmd = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.cfg.get_classf().classes_)
     cmd.plot()
     plt.show()

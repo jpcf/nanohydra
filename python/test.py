@@ -141,6 +141,10 @@ if __name__ == "__main__":
         # Display Confusion Matrix
         if(SHOW_CONFMATRIX):
             cm = confusion_matrix(Ytest, Ypred, labels=model.cfg.get_classf().classes_)
+
+            # Show accuracy instead of abs count of samples
+            cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+
             cmd = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.cfg.get_classf().classes_)
             cmd.plot()
 

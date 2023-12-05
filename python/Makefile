@@ -48,3 +48,6 @@ test_conv1d:
 
 test_scaler:
 	$(PYTHONPATH) test_scaler.py
+
+test_data_aug:
+	$(PYTHONPATH) test_data_aug.py

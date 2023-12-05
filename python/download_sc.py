@@ -47,7 +47,7 @@ num_channels = Xtrain_mfcc.shape[1]
 
 print(f"Input Len: {input_len} and Num Channels: {num_channels}")
 
-model  = NanoHydra(input_length=input_len, num_channels=num_channels, k=8, g=48, max_dilations=4, dist="binomial", classifier="Logistic", scaler="Sparse", seed=23981, dtype=np.float32)    
+model  = NanoHydra(input_length=input_len, num_channels=num_channels, k=8, g=32, max_dilations=1, dist="binomial", classifier="Logistic", scaler="Sparse", seed=23981, dtype=np.float32)    
 
 print(f"Hydra-Transforming Train Fold...")
 Xtr  = model.forward_batch(Xtrain_mfcc.astype(np.float32), 200, do_fit=True)
@@ -70,5 +70,5 @@ Xva  = model.forward_batch(Xval_mfcc.astype(np.float32), 200, do_fit=False)
 del Xval_mfcc
 gc.collect()
 model.save_transform(Xva, "SpeechCommands_300", "./work", "val")
-del Xval
+del Xva
 gc.collect()
