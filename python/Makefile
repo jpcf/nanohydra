@@ -37,10 +37,10 @@ profile_hydra:
 	$(PYTHONPATH)  profile_hydra.py
 
 download_speech_commands:
-	$(PYTHONPATH)  download_sc.py
+	$(PYTHONPATH)  download_sc_aug.py
 
 test_speech_commands: 
-	$(PYTHONPATH) test_sc.py 90000
+	$(PYTHONPATH) test_sc_aug.py 90000
 
 # Testing
 test_conv1d:

@@ -33,7 +33,7 @@ class NanoHydraCfg():
         if(classifiertype.lower() == "logistic"):
 
             #self.classf = Sequential([
-            #    Flatten(input_shape=(6000,1)),
+            #    Flatten(input_shape=(6144,1)),
             #    Dense(12, activation='softmax', kernel_regularizer=regularizers.l2(1e-4))
             #])
             #self.classf.compile(
@@ -58,7 +58,7 @@ class NanoHydraCfg():
             # Alternative 1: SGD Classifier
             self.classf = SGDClassifier(
                 loss='log_loss', 
-                alpha=0.001, 
+                alpha=0.0001, 
                 penalty='l1', 
                 class_weight="balanced", 
                 shuffle=True, 
@@ -89,9 +89,9 @@ class NanoHydraCfg():
             self.classf = ExtraTreeClassifier()
         elif(classifiertype.lower() == "nn"):
             self.classf = MLPClassifier(
-                hidden_layer_sizes=[40,20], 
+                hidden_layer_sizes=[50], 
                 activation="relu", 
-                batch_size=128, 
+                batch_size=64, 
                 learning_rate_init=0.001,
                 verbose=1, 
                 n_iter_no_change=10, 
@@ -161,7 +161,7 @@ class NanoHydra():
         if(seed is None):
             seed = int(time.time())
         self.cfg.set_seed(seed)
-        print(f"Setted Seed: {self.cfg.get_seed()}")
+        #print(f"Setted Seed: {self.cfg.get_seed()}")
         self.rng = np.random.default_rng(seed=self.cfg.get_seed())
 
     def evaluate_model_size(self):
@@ -206,7 +206,7 @@ class NanoHydra():
         return self.cfg.get_scaler().transform(X)
 
     # transform in batches of *batch_size*
-    def forward_batch(self, X, batch_size = 256, do_fit=True, Y=None):
+    def forward_batch(self, X, batch_size = 256, do_fit=True, do_scale=False):
         num_examples = X.shape[0]
         len_feat_vec = 2*self.k * self.g * self.num_dilations * self.num_channels
         Z = np.empty((num_examples, len_feat_vec))
@@ -216,8 +216,9 @@ class NanoHydra():
 
         if(do_fit):
             self.fit_scaler(Z)
-
-        Z = self.forward_scaler(Z)
+        
+        if(do_scale):
+            Z = self.forward_scaler(Z)
 
         return Z
 
@@ -301,8 +302,8 @@ class NanoHydra():
         filepath = f"{path}/{self.__generate_filename_trf_cache(ds_name)}_{split}.h5"
         
         with h5py.File(filepath, "w") as f:
-            print("Caching transform to file 'filepath'...")
-            ds = f.create_dataset(self.__generate_filename_trf_cache(ds_name), Z.shape, data=Z, chunks=True, compression="gzip", compression_opts=9)
+            print(f"Caching transform to file '{filepath}'...")
+            ds = f.create_dataset(self.__generate_filename_trf_cache(ds_name), Z.shape, data=Z, chunks=True, compression="gzip")
             print(f"Seed: {self.cfg.get_seed()}")
             ds.attrs['Seed'] = self.cfg.get_seed()
             print("Done!")
@@ -312,7 +313,7 @@ class NanoHydra():
         try:
             with h5py.File(filepath, "r") as f:
                 Z = np.array(f[self.__generate_filename_trf_cache(ds_name)][:])
-                print(f"Recorded Seed: {f[self.__generate_filename_trf_cache(ds_name)].attrs['Seed']}")
+                #print(f"Recorded Seed: {f[self.__generate_filename_trf_cache(ds_name)].attrs['Seed']}")
                 self.__set_seed(f[self.__generate_filename_trf_cache(ds_name)].attrs['Seed'])
         except FileNotFoundError as e:
             print(f"Exception: {e}")
