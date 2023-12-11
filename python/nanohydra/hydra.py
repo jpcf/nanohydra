@@ -209,6 +209,7 @@ class NanoHydra():
     def forward_batch(self, X, batch_size = 256, do_fit=True, do_scale=False):
         num_examples = X.shape[0]
         len_feat_vec = 2*self.k * self.g * self.num_dilations * self.num_channels
+        #len_feat_vec = self.k * self.g * self.num_dilations * self.num_channels
         Z = np.empty((num_examples, len_feat_vec))
 
         for idx in tqdm(range(0, num_examples, batch_size)):
@@ -263,7 +264,7 @@ class NanoHydra():
                     # Create a feature vector of size (num_groups, num_kernels) where each of the num_kernels position contains
                     # the count for the respective kernel with that index.
                     feats_hard_max = soft_counting_opt(max_indices, max_values, kernels_per_group=self.k)
-                    feats_hard_min = hard_counting_opt(min_indices, kernels_per_group=self.k)
+                    feats_hard_min = hard_counting_opt(min_indices,             kernels_per_group=self.k)
 
                     feats_hard_max = feats_hard_max.reshape((num_examples, self.h*self.k))
                     feats_hard_min = feats_hard_min.reshape((num_examples, self.h*self.k))
@@ -282,6 +283,7 @@ class NanoHydra():
                 Z = Z_chan
 
         num_feats = 2*self.k * self.g * self.num_dilations * self.num_channels
+        #num_feats = self.k * self.g * self.num_dilations * self.num_channels
         assert len(Z[0]) == num_feats, f"Dimensions of feature vector ({len(Z[0])}) do not match expected features {num_feats}"
 
         # Immediately free up RAM by marking the large vectors for deletion and calling the GC.

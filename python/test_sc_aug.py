@@ -23,7 +23,10 @@ if __name__ == "__main__":
     start = time.perf_counter()
 
     # Initialize the kernel transformer, scaler and classifier
-    model  = NanoHydra(input_length=100, num_channels=6, k=8, g=32, max_dilations=1, dist="binomial", classifier="Logistic", scaler="Sparse", seed=23981)    
+    model  = NanoHydra(input_length=100, num_channels=8, k=8, g=32, max_dilations=1, dist="normal", classifier="Logistic", scaler="Sparse", seed=1002)    
+
+    # For debugging, visualize the feature image
+    Ximg = np.empty((12000, 8192))
 
     for cl in tqdm(range(12)):
         Xcl = model.load_transform(f"SpeechCommands_300_cl_{cl}", "./work", "train")
@@ -33,12 +36,25 @@ if __name__ == "__main__":
         else:
             Xtrain = np.concatenate([Xtrain, Xcl])
             Ytrain = np.concatenate([Ytrain, cl * np.ones(len(Xcl))])
+        Ximg[cl*1000:(cl+1)*1000, :] = Xtrain[:1000,:]
 
     print(f"Shape of Xtrain: {Xtrain.shape}")
     print(f"Shape of Ytrain: {Ytrain.shape}")
 
+    print(np.min(Ximg))
+    print(np.max(Ximg))
+
+    plt.figure(1)
+    ax = plt.subplot()
+    pos = ax.imshow(Ximg)
+    plt.colorbar(pos, ax=ax)
+    for i in range(12):
+        ax.axhline(i*1000, color='r', linestyle='-')
+    plt.title(f"Transformed Training Set")
+    plt.show()
+
     # Initialize the kernel transformer, scaler and classifier
-    model  = NanoHydra(input_length=Xtrain.shape[1], num_channels=6, k=8, g=32, max_dilations=1, dist="binomial", classifier="Logistic", scaler="Sparse", seed=23981)    
+    model  = NanoHydra(input_length=Xtrain.shape[1], num_channels=8, k=8, g=32, max_dilations=1, dist="normal", classifier="Logistic", scaler="Sparse", seed=1002)    
 
     # Prepare the Train+Val split
     #val_split_idx = [-1]*len(Xtrain) + [0]*len(Xval)
@@ -52,6 +68,12 @@ if __name__ == "__main__":
     #Xval = model.load_transform(f"SpeechCommands_300", "./work", "val")
     (__, __), (__, Ytest), (__, Yval) = tfds.as_numpy(tfds.load('speech_commands', split=['train', 'test', 'validation'], batch_size=-1, as_supervised=True))
     #model.fit_tf_classifier(Xtrain, Ytrain, Xval, Yval)
+
+    # Add validation set
+    #Xval = model.load_transform(f"SpeechCommands_300", "./work", "val")
+    #Xtrain = np.concatenate([Xtrain, Xval])
+    #Ytrain = np.concatenate([Ytrain, Yval])
+
     model.fit_classifier(Xtrain, Ytrain)
     del Xtrain
     del Ytrain
