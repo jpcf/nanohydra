@@ -24,7 +24,7 @@ def transform_mfcc(X, fs=16000):
     N_MFCC = 20 
     N_MFCC_USED = 20
     for i in tqdm(range(0, X.shape[0], 1)):
-        _X = mfcc(y=X[i,:], sr=fs, n_mfcc=N_MFCC, fmin=20, fmax=4000, n_fft=512, hop_length=128, win_length=512, norm='ortho', window=hann)
+        _X = mfcc(y=X[i,:], sr=fs, n_mfcc=N_MFCC, fmin=20, fmax=4000, n_fft=512, hop_length=256, win_length=512, norm='ortho', window=hann)
         if i == 0:
             X_mfcc = np.empty((X.shape[0], N_MFCC_USED, _X.shape[1]))
         
@@ -36,7 +36,7 @@ def transform_mfcc(X, fs=16000):
 
         #show_mfcc(X_mfcc[i,:,:], "Class Original", 2)
         for n in range(len(X_mfcc[i,0,:])):
-            if(X_mfcc[i,0,n] <= 0):
+            if(X_mfcc[i,0,n] <= 0.0):
                X_mfcc[i,:8,n] = np.zeros(8)
         #show_mfcc(X_mfcc[i,:,:], "Class Tresholded", 2)
         #plt.show()

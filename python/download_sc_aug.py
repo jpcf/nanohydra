@@ -13,8 +13,8 @@ start_t = time.time()
 CLASS_SILENCE       = 10
 CLASS_UNKNOWN       = 11
 NUM_CLASSES         = 12
-NUM_SAMPLES_SCALING = 2000
-NUM_SAMPLES_UNKNOWN = 10000
+NUM_SAMPLES_SCALING = 4000
+NUM_SAMPLES_UNKNOWN = 20000
 NUM_MFCC_CHANS      = 8
 K=8
 G=32
@@ -56,8 +56,9 @@ class_loc = {i: get_idx_of_class(Ytrain, i) for i in range(NUM_CLASSES)}
 Xbackground = Xtrain[class_loc[CLASS_SILENCE]]
 
 # Augment, MFCC transform and Hydra transform samples of each class, except Background
-factors = {k:3 for k in range(NUM_CLASSES)}
-factors[CLASS_SILENCE] = 15   # Background class is much smaller than others 
+factors = {k:15 for k in range(NUM_CLASSES)}
+factors[CLASS_SILENCE] = 80   # Background class is much smaller than others 
+factors[CLASS_UNKNOWN] =  2   # Unknown class is much bigger than others 
 
 for cl in range(NUM_CLASSES):
     Xraw = Xtrain[class_loc[cl]]
@@ -68,11 +69,9 @@ for cl in range(NUM_CLASSES):
         X = np.concatenate([Xraw, Xaug])
     else:
         print(f"Subsample Class {cl} 'Unknown' (Size={len(Xraw)}, New Size={NUM_SAMPLES_UNKNOWN})")
-        #X = Xraw[np.random.choice(len(Xraw), NUM_SAMPLES_UNKNOWN, replace=False),:]
-        print(f"Shape = {Xraw.shape}")
-        X = Xraw[np.random.choice(len(Xraw), NUM_SAMPLES_UNKNOWN),:]
-        #Xaug   = augment_data_of_class(X, Xbackground, factors[cl], add_noise=factors[cl]!=CLASS_SILENCE)
-        #X = np.concatenate([X, Xaug])
+        X = Xraw[np.random.choice(len(Xraw), NUM_SAMPLES_UNKNOWN, replace=False),:]
+        Xaug   = augment_data_of_class(X, Xbackground, factors[cl], add_noise=factors[cl]!=CLASS_SILENCE)
+        X = np.concatenate([X, Xaug])
         print(f"Shape = {X.shape}")
 
     print(f"MFCC-Transforming Class {cl}...")
@@ -105,7 +104,7 @@ for cl in range(NUM_CLASSES):
     print(f"Scaling Class {cl}")
     X = model.load_transform(f"SpeechCommands_300_cl_{cl}_notscaled", "./work", "train")
     X = scaler.transform(X)
-    model.save_transform(X, f"SpeechCommands_300_cl_{cl}", "./work", "train")
+    model.save_transform(X.astype(np.float32), f"SpeechCommands_300_cl_{cl}", "./work", "train")
 
 del Xtrain
 del Ytrain
