@@ -23,10 +23,10 @@ if __name__ == "__main__":
     start = time.perf_counter()
 
     # Initialize the kernel transformer, scaler and classifier
-    model  = NanoHydra(input_length=100, num_channels=8, k=8, g=32, max_dilations=1, dist="normal", classifier="Logistic", scaler="Sparse", seed=1002)    
+    model  = NanoHydra(input_length=100, num_channels=12, k=8, g=32, max_dilations=1, dist="normal", classifier="Logistic", scaler="Sparse", seed=1002)    
 
     # For debugging, visualize the feature image
-    Ximg = np.empty((12000, 8192))
+    Ximg = np.empty((12000, 12288))
 
     for cl in tqdm(range(12)):
         Xcl = model.load_transform(f"SpeechCommands_300_cl_{cl}", "./work", "train")
@@ -54,7 +54,7 @@ if __name__ == "__main__":
     plt.show()
 
     # Initialize the kernel transformer, scaler and classifier
-    model  = NanoHydra(input_length=Xtrain.shape[1], num_channels=8, k=8, g=32, max_dilations=1, dist="normal", classifier="Logistic", scaler="Sparse", seed=1002)    
+    model  = NanoHydra(input_length=Xtrain.shape[1], num_channels=12, k=8, g=32, max_dilations=1, dist="normal", classifier="Logistic", scaler="Sparse", seed=1002)    
 
     # Prepare the Train+Val split
     #val_split_idx = [-1]*len(Xtrain) + [0]*len(Xval)
