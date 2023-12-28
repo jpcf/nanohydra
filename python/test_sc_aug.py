@@ -18,25 +18,62 @@ from nanohydra.utils import vs_creator
 BATCH_TRAIN = True
 BATCH_SIZE  = 32
 
+DO_EXPERIMENT_W12 = False
+DO_EXPERIMENT_W2  = False
+DO_EXPERIMENT_W11 = True
+
+DO_SHOW_FEATURES = True
+
+CLASS_SILENCE = 10
+CLASS_UNKNOWN = 11
+
+K=8
+G=64
+D=1
+
 if __name__ == "__main__":
 
     start = time.perf_counter()
 
     # Initialize the kernel transformer, scaler and classifier
-    model  = NanoHydra(input_length=100, num_channels=12, k=8, g=32, max_dilations=1, dist="normal", classifier="Logistic", scaler="Sparse", seed=1002)    
+    model  = NanoHydra(input_length=100, num_channels=8, k=8, g=32, max_dilations=D, dist="normal", classifier="Logistic", scaler="Sparse", seed=1002)    
 
     # For debugging, visualize the feature image
-    Ximg = np.empty((12000, 12288))
+    Ximg = np.empty((12000, 8192))
 
-    for cl in tqdm(range(12)):
-        Xcl = model.load_transform(f"SpeechCommands_300_cl_{cl}", "./work", "train")
-        if(cl == 0):
-            Xtrain = Xcl
-            Ytrain = cl * np.ones(len(Xcl))
-        else:
-            Xtrain = np.concatenate([Xtrain, Xcl])
-            Ytrain = np.concatenate([Ytrain, cl * np.ones(len(Xcl))])
-        Ximg[cl*1000:(cl+1)*1000, :] = Xtrain[:1000,:]
+    if(DO_EXPERIMENT_W12):    
+        for cl in tqdm(range(12)):
+            Xcl = model.load_transform(f"SpeechCommands_300_cl_{cl}", "./work", "train")
+            if(cl == 0):
+                Xtrain = Xcl
+                Ytrain = cl * np.ones(len(Xcl))
+            else:
+                Xtrain = np.concatenate([Xtrain, Xcl])
+                Ytrain = np.concatenate([Ytrain, cl * np.ones(len(Xcl))])
+            Ximg[cl*1000:(cl+1)*1000, :] = Xtrain[:1000,:]
+    
+    elif(DO_EXPERIMENT_W2):
+        # First, load silence class
+        Xcl = model.load_transform(f"SpeechCommands_300_cl_10", "./work", "train")
+        Xtrain = Xcl
+        Ytrain = np.zeros(len(Xcl))
+
+        for cl in tqdm(range(12)):
+            Xcl = model.load_transform(f"SpeechCommands_300_cl_{cl}", "./work", "train")
+            if(cl != CLASS_SILENCE):
+                Xtrain = np.concatenate([Xtrain, Xcl])
+                Ytrain = np.concatenate([Ytrain, np.ones(len(Xcl))])
+
+    if(DO_EXPERIMENT_W11):    
+        for cl in tqdm(range(12)):
+            Xcl = model.load_transform(f"SpeechCommands_300_cl_{cl}", "./work", "train")
+            if(cl == 0):
+                Xtrain = Xcl
+                Ytrain = cl * np.ones(len(Xcl))
+            else:
+                Xtrain = np.concatenate([Xtrain, Xcl])
+                Ytrain = np.concatenate([Ytrain, cl * np.ones(len(Xcl))])
+            Ximg[cl*1000:(cl+1)*1000, :] = Xtrain[:1000,:]
 
     print(f"Shape of Xtrain: {Xtrain.shape}")
     print(f"Shape of Ytrain: {Ytrain.shape}")
@@ -44,17 +81,18 @@ if __name__ == "__main__":
     print(np.min(Ximg))
     print(np.max(Ximg))
 
-    plt.figure(1)
-    ax = plt.subplot()
-    pos = ax.imshow(Ximg)
-    plt.colorbar(pos, ax=ax)
-    for i in range(12):
-        ax.axhline(i*1000, color='r', linestyle='-')
-    plt.title(f"Transformed Training Set")
-    plt.show()
+    if(DO_SHOW_FEATURES):
+        plt.figure(1)
+        ax = plt.subplot()
+        pos = ax.imshow(Ximg)
+        plt.colorbar(pos, ax=ax)
+        for i in range(12):
+            ax.axhline(i*1000, color='r', linestyle='-')
+        plt.title(f"Transformed Training Set")
+        plt.show()
 
     # Initialize the kernel transformer, scaler and classifier
-    model  = NanoHydra(input_length=Xtrain.shape[1], num_channels=12, k=8, g=32, max_dilations=1, dist="normal", classifier="Logistic", scaler="Sparse", seed=1002)    
+    model  = NanoHydra(input_length=Xtrain.shape[1], num_channels=8, k=8, g=32, max_dilations=D, dist="normal", classifier="Logistic", scaler="Sparse", seed=1002)    
 
     # Prepare the Train+Val split
     #val_split_idx = [-1]*len(Xtrain) + [0]*len(Xval)
@@ -67,30 +105,36 @@ if __name__ == "__main__":
     # Train the classifier
     #Xval = model.load_transform(f"SpeechCommands_300", "./work", "val")
     (__, __), (__, Ytest), (__, Yval) = tfds.as_numpy(tfds.load('speech_commands', split=['train', 'test', 'validation'], batch_size=-1, as_supervised=True))
-    #model.fit_tf_classifier(Xtrain, Ytrain, Xval, Yval)
 
-    # Add validation set
-    #Xval = model.load_transform(f"SpeechCommands_300", "./work", "val")
     #Xtrain = np.concatenate([Xtrain, Xval])
     #Ytrain = np.concatenate([Ytrain, Yval])
 
-    model.fit_classifier(Xtrain, Ytrain)
-    del Xtrain
-    del Ytrain
-    gc.collect()
-
-
-    # Load the Test set
+    print("Loading the validation set")
+    Xval = model.load_transform(f"SpeechCommands_300", "./work", "val")
     print("Loading the test set")
     Xtest = model.load_transform(f"SpeechCommands_300", "./work", "test")
 
+    model.fit_classifier(Xtrain, Ytrain)
+    #model.fit_tf_classifier(Xtrain, Ytrain, Xval, Yval)
+
     # Perform Predictions  
-    #Ypred = model.predict_tf(Xtest)
-    Ypred = model.predict_batch(Xtest, 256)
+    print("Predicting on Test set")
+    Ypred     = model.predict_batch(Xtest, 256)
+    print("Predicting on Validation set")
+    Ypred_val = model.predict_batch(Xval,  256)
+    print("Predicting on Train set")
+    Ypred_train = model.predict_batch(Xtrain,  256)
     
+    del Xtrain
+    gc.collect()
+
     # Score the classifier
     score_man = model.score_manual(Ypred, Ytest, "subset")
     print(f"Score    for 'Speech Commands v0.0.3': {100*score_man:0.02f} %") 	
+    score_man = model.score_manual(Ypred_val, Yval, "subset")
+    print(f"Score (val) for 'Speech Commands v0.0.3': {100*score_man:0.02f} %") 	
+    score_man = model.score_manual(Ypred_train, Ytrain, "subset")
+    print(f"Score (val) for 'Speech Commands v0.0.3': {100*score_man:0.02f} %") 	
 
     cm = confusion_matrix(Ytest, Ypred, labels=model.cfg.get_classf().classes_)
     # Show accuracy instead of abs count of samples
