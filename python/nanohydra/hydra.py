@@ -392,13 +392,13 @@ class SparseScaler():
         X = np.sqrt(np.clip(X, a_min=0, a_max=None))
 
         self.epsilon = np.mean((X == 0), axis=0) ** self.exponent + 1e-8
-        print(f"self.epsilon: {self.epsilon}")
+        #print(f"self.epsilon: {self.epsilon}")
 
         if self.mask:
             
-            print(f"Shape of X  = {X.shape}")
-            print(f"Shape of m  = {self.mu.shape}")
-            print(f"Shape of s  = {self.sigma.shape}")
+            #print(f"Shape of X  = {X.shape}")
+            #print(f"Shape of m  = {self.mu.shape}")
+            #print(f"Shape of s  = {self.sigma.shape}")
             
             for col in range(X.shape[1]):
                 X[:,col] = (X[:,col] - self.mu[col])*(X[:,col] != 0)
