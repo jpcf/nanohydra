@@ -21,24 +21,40 @@ def vs_creator(X, Y, class_to_elim, method="onevsall"):
         assert False, f"Unknown Method Chosen: '{method}'"
 
 def transform_mfcc(X, fs=16000):
-    N_MFCC = 12 
-    N_MFCC_USED = 12
+    N_MFCC = 20 
+    N_MFCC_USED = 8
+    NORM_MINMAX = False
+
     for i in tqdm(range(0, X.shape[0], 1)):
         _X = mfcc(y=X[i,:], sr=fs, n_mfcc=N_MFCC, fmin=20, fmax=4000, n_fft=512, hop_length=128, win_length=512, norm='ortho', window=hann)
         if i == 0:
-            X_mfcc = np.empty((X.shape[0], N_MFCC_USED, _X.shape[1]))
+            X_mfcc  = np.empty((X.shape[0], N_MFCC_USED, _X.shape[1]))
+            #outline = np.empty((X.shape[0],           3, _X.shape[1]))
         
         X_mfcc[i,:,:]  = _X[:N_MFCC_USED,:]
-        #X_mfcc[i,:,:] -=  np.min(X_mfcc[i,:,:])
-        #X_mfcc[i,:,:] /=  (np.max(X_mfcc[i,:,:]) - np.min(X_mfcc[i,:,:]))
-        X_mfcc[i,:,:] -=  np.mean(X_mfcc[i,:,:], axis=1)[:,np.newaxis]
-        X_mfcc[i,:,:] /=  np.std(X_mfcc[i,:,:], axis=1)[:,np.newaxis]
+        if(NORM_MINMAX):
+            vmin = np.min(X_mfcc[i,:,:], axis=1)[:,np.newaxis]
+            vmax = np.max(X_mfcc[i,:,:], axis=1)[:,np.newaxis]
+            X_mfcc[i,:,:] -= vmin
+            X_mfcc[i,:,:] /= (vmax-vmin) 
+        else:
+            mean = np.mean(X_mfcc[i,:,:], axis=1)[:,np.newaxis]
+            std  = np.std (X_mfcc[i,:,:], axis=1)[:,np.newaxis]
+            X_mfcc[i,:,:] -= mean
+            X_mfcc[i,:,:] /= std 
 
-        #show_mfcc(X_mfcc[i,:,:], "Class Original", 2)
+        #show_mfcc(X_mfcc[i,:,:], "Class Tresholded", 1)
         for n in range(len(X_mfcc[i,0,:])):
             if(X_mfcc[i,0,n] <= 0.0):
                X_mfcc[i,:N_MFCC_USED,n] = np.zeros(N_MFCC_USED)
+            #elif(X_mfcc[i,0,n] <= 0.2):
+            #   X_mfcc[i,:N_MFCC_USED,n] = (X_mfcc[i,0,n]/0.2) * X_mfcc[i,:N_MFCC_USED,n]
+            #outline[i,0,n] = np.dot(X_mfcc[i,1:3,n], np.array([2,1]))
+            #outline[i,1,n] = np.dot(X_mfcc[i,3:5,n], np.array([2,1]))
+            #outline[i,2,n] = np.dot(X_mfcc[i,5:7,n], np.array([2,1]))
         #show_mfcc(X_mfcc[i,:,:], "Class Tresholded", 2)
+        #plt.show()
+        #plt.plot(outline)
         #plt.show()
 
 
@@ -83,7 +99,7 @@ def augment_data_of_class(X, Xbackground, factor, add_noise=True):
 
     # Variable Params
     MAX_SHIFT = 0.2
-    MAX_BACKGROUND_VOL = 0.2
+    MAX_BACKGROUND_VOL = 0.1
 
     # Calculable params
     LEN_BACKGROUND_SAMPLES = len(Xbackground)
