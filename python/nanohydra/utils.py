@@ -26,7 +26,7 @@ def transform_mfcc(X, fs=16000):
     NORM_MINMAX = False
 
     for i in tqdm(range(0, X.shape[0], 1)):
-        _X = mfcc(y=X[i,:], sr=fs, n_mfcc=N_MFCC, fmin=20, fmax=4000, n_fft=512, hop_length=128, win_length=512, norm='ortho', window=hann)
+        _X = mfcc(y=X[i,:], sr=fs, n_mfcc=N_MFCC, fmin=20, fmax=8000, n_fft=512, hop_length=128, win_length=512, norm='ortho', window=hann)
         if i == 0:
             X_mfcc  = np.empty((X.shape[0], N_MFCC_USED, _X.shape[1]))
             #outline = np.empty((X.shape[0],           3, _X.shape[1]))
@@ -112,7 +112,7 @@ def augment_data_of_class(X, Xbackground, factor, add_noise=True):
     itercnt = 0
     for idx in tqdm(range(LEN_CLASS_SAMPLES)):
         for f in range(factor-1):
-            shift = int(np.random.uniform(-MAX_SHIFT, MAX_SHIFT) * FS)
+            shift = int(np.random.uniform(-MAX_SHIFT, MAX_SHIFT) * (FS))
             if(shift < 0):
                 Xshift = np.concatenate([np.zeros(-shift), X[idx,-shift:]])
             elif(shift > 0):
