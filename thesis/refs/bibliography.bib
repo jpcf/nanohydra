@@ -13,13 +13,210 @@
 
 @Article{Dempster2023Hydra,
   author       = {Dempster, Angus and Schmidt, Daniel F. and Webb, Geoffrey I.},
-  title        = {Hydra: competing convolutional kernels for fast and accurate time series classification},
-  journaltitle = {Data Mining and Knowledge Discovery},
-  year         = {2023},
   date         = {2023-09-01},
+  journaltitle = {Data Mining and Knowledge Discovery},
+  title        = {Hydra: competing convolutional kernels for fast and accurate time series classification},
   doi          = {https://doi.org/10.1007/s10618-023-00939-3},
   abstract     = {We demonstrate a simple connection between dictionary methods for time series classification, which involve extracting and counting symbolic patterns in time series, and methods based on transforming input time series using convolutional kernels, namely Rocket and its variants. We show that by adjusting a single hyperparameter it is possible to move by degrees between models resembling dictionary methods and models resembling Rocket. We present Hydra, a simple, fast, and accurate dictionary method for time series classification using competing convolutional kernels, combining key aspects of both Rocket and conventional dictionary methods. Hydra is faster and more accurate than the most accurate existing dictionary methods, achieving similar accuracy to several of the most accurate current methods for time series classification. Hydra can also be combined with Rocket and its variants to significantly improve the accuracy of these methods.},
   file         = {:pdfs/Hydra_s10618-023-00939-3.pdf:PDF},
+  year         = {2023},
+}
+
+@Article{MiniRocket_IoT_2023,
+  author   = {Marco Giordano and Silvano Cortesi and Michele Crabolu and Lavinia Pedrollo and Giovanni Bellusci and Tommaso Bendinelli and Engin Turetken and Andra Dunbar and Michele Magno},
+  date     = {2023-10-18},
+  title    = {Optimizing IoT-Based Asset and UtilizationTracking: Efficient Activity Classification withM INI ROCKET on Resource-Constrained Devices},
+  abstract = {This paper introduces an effective solution for
+retrofitting construction power tools with low-power Internet
+of Things (IoT) to enable accurate activity classification. We
+address the challenge of distinguishing between when a power
+tool is being moved and when it is actually being used. To
+achieve classification accuracy and power consumption preser-
+vation a newly released algorithm called MINImally RandOm
+Convolutional KErnel Transform (M INI ROCKET) was employed.
+Known for its accuracy, scalability, and fast training for time-
+series classification, in this paper, it is proposed as a TinyML
+algorithm for inference on resource-constrained IoT devices.
+The paper demonstrates the portability and performance of
+M INI ROCKET on a resource-constrained, ultra-low power sensor
+node for floating-point and fixed-point arithmetic, matching up
+to 1% of the floating-point accuracy. The hyperparameters of
+the algorithm have been optimized for the task at hand to
+find a Pareto point that balances memory usage, accuracy and
+energy consumption. For the classification problem, we rely on
+an accelerometer as the sole sensor source, and B LUETOOTH
+L OW E NERGY (BLE) for data transmission. Extensive real-world
+construction data, using 16 different power tools, were collected,
+labeled, and used to validate the algorithm’s performance directly
+embedded in the IoT device. Experimental results demonstrate
+that the proposed solution achieves an accuracy of 96.9%
+in distinguishing between real usage status and other motion
+statuses while consuming only 7 kB of flash and 3 kB of RAM.
+The final application exhibits an average current consumption of
+less than 15 μW for the whole system, resulting in battery life
+performance ranging from 3 to 9 years depending on the battery
+capacity (250 − 500 mAh) and the number of power tool usage
+hours (100 − 1500 h).},
+  comment  = {- The paper presents an implementation of the MiniRocket algorithm targeting an ARM Cortex M4-F family processor. It is the first C implementation of the algorithm, and the first to target an MCU. Additionally, it is also the first *fixed-point* implementation of the algorithm.
+
+- The use-case scenario of this implementation seems to be limited to activity recognition on power tool usage, with the end of asset utilization management and tracking in a construction environment. Since fitting existing tools with newer hardware requires re-certification, the most practical alternative is the attachement of self-powered electronics that share no electrical connection to the tool. Thus the requirement arises for energy-efficiency, in order to prolong battery life and minimize field maintenance.
+
+- The authors claim to have implemented MiniRocket, but in its original form the algorithm is considerably more complex: for each of the 84 kernels, the algorithm repeats the convolution operation for different dilation levels (here the paper is actually wrong as it fails to mention this fact), totalling almost 10k features, versus the only 84 the authors refer using.
+
+- This either means that the original algorithm is unnecessarily complex (and this work sets a new state-of-the-art also in regards to algorithm itself), or that 84 features simply happen to be enough for *this particular* dataset, and would not generalize well to other diverse datasets (like UCR). This can be an indicator that it is worth considering exploring smaller algorithm topologies during the evaluation phase.
+
+- Regardless of the previous comments, this presents an extremely useful resource for understading the implications of weight quantization on this specific algorithm, as is the first experiment in doing so. It proves quantization is possible with minimal accuracy penalties, which is possibly a green flag for our algorithm as well.
+
+- Unfortunately, the authors provide no code, and no access to the dataset, which limits result reproducibility, and possible comparison of my work with theirs.},
+  file     = {:pdfs/HILTI_MiniRocket_Paper_WFIoT_final_final.pdf:PDF},
+}
+
+@Article{Craik2019,
+  author       = {Alexander Craik and Yongtian He and Jose L Contreras-Vidal},
+  date         = {2019-04},
+  journaltitle = {Journal of Neural Engineering},
+  title        = {Deep learning for electroencephalogram ({EEG}) classification tasks: a review},
+  doi          = {10.1088/1741-2552/ab0ab5},
+  number       = {3},
+  pages        = {031001},
+  volume       = {16},
+  abstract     = {Objective. Electroencephalography (EEG) analysis has been an important tool in neuroscience
+with applications in neuroscience, neural engineering (e.g. Brain–computer interfaces, BCI’s),
+and even commercial applications. Many of the analytical tools used in EEG studies have used
+machine learning to uncover relevant information for neural classification and neuroimaging.
+Recently, the availability of large EEG data sets and advances in machine learning have
+both led to the deployment of deep learning architectures, especially in the analysis of EEG
+signals and in understanding the information it may contain for brain functionality. The
+robust automatic classification of these signals is an important step towards making the
+use of EEG more practical in many applications and less reliant on trained professionals.
+Towards this goal, a systematic review of the literature on deep learning applications to EEG
+classification was performed to address the following critical questions: (1) Which EEG
+classification tasks have been explored with deep learning? (2) What input formulations
+have been used for training the deep networks? (3) Are there specific deep learning network
+structures suitable for specific types of tasks? Approach. A systematic literature review of EEG
+classification using deep learning was performed on Web of Science and PubMed databases,
+resulting in 90 identified studies. Those studies were analyzed based on type of task, EEG
+preprocessing methods, input type, and deep learning architecture. Main results. For EEG
+classification tasks, convolutional neural networks, recurrent neural networks, deep belief
+networks outperform stacked auto-encoders and multi-layer perceptron neural networks in
+classification accuracy. The tasks that used deep learning fell into five general groups: emotion
+recognition, motor imagery, mental workload, seizure detection, event related potential
+detection, and sleep scoring. For each type of task, we describe the specific input formulation,
+major characteristics, and end classifier recommendations found through this review.
+Significance. This review summarizes the current practices and performance outcomes in the
+use of deep learning for EEG classification. Practical suggestions on the selection of many
+hyperparameters are provided in the hope that they will promote or guide the deployment of
+deep learning to EEG datasets in future research},
+  comment      = {- The paper presents a survey of methods and algorithms for EEG classification.
+
+- EEG Classification applications include:
+	- Emotion Recognition (16%)
+	- Motor Imagery (22%)
+	- Mental Workload (16%)
+	- Seizure Detection (14%)
+	- Event-related potential detection (10%)
+	- Sleep Scoring (13%)
+	- Others (13%)
+
+- Datasets consist of groups of [channel, timestamp] samples.
+- Generally pre-processing is needed, namely:
+	- ICA used for artifact removal
+	- PCA for dimensionality reduction (as the number of channels can be very large).},
+  file         = {:pdfs/Craik_2019_J._Neural_Eng._16_031001.pdf:PDF},
+  publisher    = {{IOP} Publishing},
+}
+
+@Misc{Dempster2023,
+  author    = {Dempster, Angus and Schmidt, Daniel F. and Webb, Geoffrey I.},
+  date      = {2023},
+  title     = {QUANT: A Minimalist Interval Method for Time Series Classification},
+  doi       = {10.48550/ARXIV.2308.00928},
+  copyright = {arXiv.org perpetual, non-exclusive license},
+  file      = {:pdfs/Quant_2308.00928.pdf:PDF},
+  keywords  = {Machine Learning (cs.LG), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  publisher = {arXiv},
+}
+
+@Article{Uribarri2023,
+  author       = {Gonzalo Uribarri and Federico Barone and Alessio Ansuini and Erik Frans{\'{e}}n},
+  date         = {2023},
+  journaltitle = {CoRR},
+  title        = {Detach-ROCKET: Sequential feature selection for time series classification with random convolutional kernels},
+  doi          = {10.48550/ARXIV.2309.14518},
+  eprint       = {2309.14518},
+  eprinttype   = {arXiv},
+  volume       = {abs/2309.14518},
+  bibsource    = {dblp computer science bibliography, https://dblp.org},
+  biburl       = {https://dblp.org/rec/journals/corr/abs-2309-14518.bib},
+  file         = {:pdfs/Detach_Rocket_2309.14518.pdf:PDF},
+}
+
+@Article{Middlehurst2023,
+  author       = {Matthew Middlehurst and Patrick Sch{\"{a}}fer and Anthony J. Bagnall},
+  date         = {2023},
+  journaltitle = {CoRR},
+  title        = {Bake off redux: a review and experimental evaluation of recent time series classification algorithms},
+  doi          = {10.48550/ARXIV.2304.13029},
+  eprint       = {2304.13029},
+  eprinttype   = {arXiv},
+  volume       = {abs/2304.13029},
+  bibsource    = {dblp computer science bibliography, https://dblp.org},
+  biburl       = {https://dblp.org/rec/journals/corr/abs-2304-13029.bib},
+  file         = {:pdfs/Bake-off-redux-2304.13029.pdf:PDF},
+}
+
+@Article{Zhao2023,
+  author       = {Jianjin Zhao and Qi Li and Jintao Sun and Mianxiong Dong and Kaoru Ota and Meng Shen},
+  date         = {2023},
+  journaltitle = {IEEE Internet of Things Journal (Early Access)},
+  title        = {Efficient IoT Device Identification via Network Behavior Analysis Based on Time Series Dictionary},
+  doi          = {10.1109/jiot.2023.3305585},
+  issn         = {2327-4662},
+  pages        = {1-1},
+  file         = {:pdfs/Efficient_IoT_Device_Identification_via_Network_Behavior_Analysis_Based_on_Time_Series_Dictionary.pdf:PDF},
+}
+
+@InProceedings{Lundy2021,
+  author          = {Christopher Lundy and John M. O'Toole},
+  date            = {23-27 Aug. 2021},
+  title           = {Random Convolution Kernels with Multi-Scale Decomposition for Preterm EEG Inter-burst Detection},
+  doi             = {10.23919/EUSIPCO54536.2021.9616281},
+  eventdate       = {23-27 Aug. 2021},
+  eventtitleaddon = {Dublin, Ireland},
+  isbn            = {978-1-6654-0900-1},
+  location        = {Dublin, Ireland},
+  pages           = {1182--1186},
+  publisher       = {IEEE},
+  abstract        = {Linear classifiers with random convolution kernels are computationally efficient methods that need no design or domain knowledge. Unlike deep neural networks, there is no need to hand-craft a network architecture; the kernels are randomly generated and only the linear classifier needs training. A recently proposed method, RandOm Convolutional KErnel Transforms (ROCKETs), has shown high accuracy across a range of time-series data sets. Here we propose a multi-scale version of this method, using both high- and low-frequency components. We apply our methods to inter-burst detection in a cohort of preterm EEG recorded from 36 neonates <30 weeks gestational age. Two features from the convolution of 10,000 random kernels are combined using ridge regression. The proposed multi-scale ROCKET method out-performs the method without scale: median (interquartile range, IQR) Matthews correlation coefficient (MCC) of 0.859 (0.815 to 0.874) for multi-scale versus 0.841 (0.807 to 0.865) without scale, p < 0.001. The proposed method lags behind an existing feature-based machine learning method developed with deep domain knowledge, but is fast to train and can quickly set an initial baseline threshold of performance for generic and biomedical time-series classification.},
+  file            = {:- Random Convolution Kernels with Multi Scale Decomposition for Preterm EEG Inter Burst Detection.html:URL;:pdfs/Random_Convolution_Kernels_with_Multi-Scale_Decomposition_for_Preterm_EEG_Inter-burst_Detection.pdf:PDF},
+  issn            = {2219-5491},
+  journaltitle    = {2021 29th European Signal Processing Conference (EUSIPCO)},
+  keywords        = {Training, Deep learning, Rockets, Pediatrics, Convolution, Europe, Transforms, Preterm, Electroencephalography, Interburst, ROCKET, Randomised Convolution Kernel},
+  year            = {2021},
+}
+
+@InProceedings{TinyML2022,
+  author    = {Han, Hui and Siebert, Julien},
+  booktitle = {2022 International Conference on Artificial Intelligence in Information and Communication (ICAIIC)},
+  title     = {TinyML: A Systematic Review and Synthesis of Existing Research},
+  doi       = {10.1109/ICAIIC54071.2022.9722636},
+  pages     = {269-274},
+  abstract  = {Tiny Machine Learning (TinyML), a rapidly evolving edge computing concept that links embedded systems (hardware and software) and machine learning, with the purpose of realizing ultra-low-power and low-cost and efficiency and privacy, brings machine learning inference to battery-powered intelligent devices. In this study, we conduct a systematic review of TinyML research by synthesizing 47 papers from academic and grey publication since 2019 (the early TinyML publication starts from 2019). Relevant TinyML literature is analyzed from five aspects: hardware, framework, datasets, use cases, and algorithms/model. This systematic review will serve as a roadmap for understanding the literature within the new emerging field of TinyML.},
+  file      = {:pdfs/TinyML_A_Systematic_Review_and_Synthesis_of_Existing_Research.pdf:PDF},
+  year      = {2022},
+}
+
+@Article{Warden2018,
+  author      = {Pete Warden},
+  title       = {Speech Commands: A Dataset for Limited-Vocabulary Speech Recognition},
+  date        = {2018-04-09},
+  eprint      = {1804.03209v1},
+  eprintclass = {cs.CL},
+  eprinttype  = {arXiv},
+  url         = {https://arxiv.org/abs/1804.03209},
+  abstract    = {Describes an audio dataset of spoken words designed to help train and evaluate keyword spotting systems. Discusses why this task is an interesting challenge, and why it requires a specialized dataset that is different from conventional datasets used for automatic speech recognition of full sentences. Suggests a methodology for reproducible and comparable accuracy metrics for this task. Describes how the data was collected and verified, what it contains, previous versions and properties. Concludes by reporting baseline results of models trained on this dataset.},
+  file        = {:pdfs/Warden_SpeechCommands.pdf:PDF},
+  keywords    = {cs.CL, cs.HC},
 }
 
 @Comment{jabref-meta: databaseType:biblatex;}
