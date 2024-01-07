@@ -31,30 +31,6 @@ class NanoHydraCfg():
 
         # Define Classifier
         if(classifiertype.lower() == "logistic"):
-
-            #self.classf = Sequential([
-            #    Flatten(input_shape=(6144,1)),
-            #    Dense(12, activation='softmax', kernel_regularizer=regularizers.l2(1e-4))
-            #])
-            #self.classf.compile(
-            #    optimizer='adam',
-            #    loss=SparseCategoricalCrossentropy(),
-            #    metrics='accuracy'
-            #)
-            #self.classf.build()
-            #self.classf.summary()
-            # Alternative 2: LR with SAGA 
-            #self.classf = LogisticRegressionCV(
-            #        penalty="l2",
-            #        Cs = [1, 10, 100, ],
-            #        cv=classifier_args['cv'],
-            #        class_weight= 'balanced',
-            #        solver='saga',
-            #        multi_class='multinomial',
-            #        verbose=1,
-            #        max_iter=200,
-            #        n_jobs=22,
-            #        )
             # Alternative 1: SGD Classifier
             self.classf = SGDClassifier(
                 loss='log_loss', 
@@ -63,11 +39,11 @@ class NanoHydraCfg():
                 class_weight="balanced", 
                 shuffle=True, 
                 n_jobs=22, 
-                verbose=1, 
+                verbose=0, 
                 tol=1e-4, 
                 learning_rate='adaptive', 
                 eta0=1e-3, 
-                n_iter_no_change=5
+                n_iter_no_change=20
             )
         elif(classifiertype.lower() == "ridge"):
             self.classf = RidgeClassifierCV(alphas=np.logspace(0,1,50), store_cv_values=True)
@@ -142,13 +118,13 @@ class NanoHydra():
         self.h = self.g // self.divisor
 
         if(dist == "normal"):
-            self.W = self.rng.standard_normal(size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN)).astype(self.dtype)
+            self.W = self.rng.standard_normal(size=(self.h, self.k, self.__KERNEL_LEN)).astype(self.dtype)
             self.W = self.W - np.mean(self.W)
             self.W = self.W / np.sum(np.abs(self.W))
         elif(dist == "binomial"):
-            self.W = self.rng.choice([-1, 1], size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN), p=[0.5, 0.5]).astype(self.dtype)
+            self.W = self.rng.choice([-1, 1], size=(self.h, self.k, self.__KERNEL_LEN), p=[0.5, 0.5]).astype(self.dtype)
         elif(dist == "tetranomial"):
-            self.W = self.rng.choice([-2, -1, 1, 2], size=(self.num_dilations, self.divisor, self.h, self.k, self.__KERNEL_LEN), p=[0.1, 0.4, 0.4, 0.1]).astype(self.dtype)
+            self.W = self.rng.choice([-2, -1, 1, 2], size=(self.h, self.k, self.__KERNEL_LEN), p=[0.1, 0.4, 0.4, 0.1]).astype(self.dtype)
 
         # Preliminary message with model dimensions
         self.evaluate_model_size()
@@ -237,23 +213,24 @@ class NanoHydra():
 
         Z = []
 
-        for channel in range(self.num_channels):
-            Z_chan = []
-            
-            for dilation_index in range(self.num_dilations):
+        for dilation_index in range(self.num_dilations):
 
-                d = self.dilations[dilation_index]
+            d = self.dilations[dilation_index]
 
-                feats = [None for i in range(self.divisor)]
+            feats_diff = [None for i in range(self.divisor)]
 
-                for diff_index in range(self.divisor):
+            for diff_index in range(self.divisor):
 
-                    #print(f"Transforming {num_examples} input samples for dilation {d} and diff_idx {diff_index}")
+
+                feats = [None for i in range(self.num_channels)]
+                
+                for channel in range(self.num_channels):
                     _X = X[:,channel,:] if diff_index == 0 else diff_X[:,channel,:]
+
                     # Perform convolution on all kernels of a given dilation
                     #print(f"Current Dilation: {d}")
-                    #_Z = conv1d_opt_x_int16_w_b1(_X, self.W[dilation_index, diff_index], dilation = d)
-                    _Z = conv1d_opt_x_f32_w_f32(_X, self.W[dilation_index, diff_index], dilation = d)
+                    #_Z = conv1d_opt_x_int16_w_b1(_X, self.W, dilation = d)
+                    _Z = conv1d_opt_x_f32_w_f32(_X, self.W, dilation = d)
 
                     # For each example, calculate the (arg)max/min over the k kernels of a given group.
                     # Here we should "collapse" the second dimension of the tensor, where the kernel indices are.
@@ -269,29 +246,26 @@ class NanoHydra():
                     feats_hard_max = feats_hard_max.reshape((num_examples, self.h*self.k))
                     feats_hard_min = feats_hard_min.reshape((num_examples, self.h*self.k))
 
-                    feats[diff_index] = np.concatenate((feats_hard_max, feats_hard_min), axis=1)
+                    feats[channel] = np.concatenate((feats_hard_max, feats_hard_min), axis=1)
 
-                feats = np.concatenate((feats[0], feats[1]), axis=1)
-
-                if(dilation_index):
-                    Z_chan = np.concatenate((Z_chan,feats), axis=1)
+                if(self.num_channels==1):
+                    feats_diff[diff_index] = feats[0]
                 else:
-                    Z_chan = feats
-            if(channel):
-                Z = np.concatenate((Z,Z_chan), axis=1)
+                    feats_diff[diff_index] = np.concatenate((feats[i] for i in range(self.num_channels)), axis=1)
+
+            feats_dil = np.concatenate((feats_diff[0], feats_diff[1]), axis=1)
+
+            if(dilation_index):
+                Z = np.concatenate((Z,feats_dil), axis=1)
             else:
-                Z = Z_chan
+                Z = feats_dil
 
         num_feats = 2*self.k * self.g * self.num_dilations * self.num_channels
-        #num_feats = self.k * self.g * self.num_dilations * self.num_channels
         assert len(Z[0]) == num_feats, f"Dimensions of feature vector ({len(Z[0])}) do not match expected features {num_feats}"
 
         # Immediately free up RAM by marking the large vectors for deletion and calling the GC.
-        del X
-        del diff_X
-        del _X
-        del feats
-        del Z_chan
+        del X, diff_X, _X
+        del feats, feats_diff, feats_dil
         gc.collect()
 
         return Z
@@ -370,7 +344,7 @@ class SparseScaler():
 
     def fit(self, X):
 
-        X = np.sqrt(np.clip(X, a_min=0, a_max=None))
+        X = np.clip(X, a_min=0, a_max=None)
 
         # Since X has dimensions (num_examples, num_features), we perform the operations 
         # on each example (feature vector). Therefore, from here on we perform operations on axis=1
@@ -389,7 +363,7 @@ class SparseScaler():
 
         assert self.fitted, "Not fitted."
 
-        X = np.sqrt(np.clip(X, a_min=0, a_max=None))
+        X = np.clip(X, a_min=0, a_max=None)
 
         self.epsilon = np.mean((X == 0), axis=0) ** self.exponent + 1e-8
         #print(f"self.epsilon: {self.epsilon}")

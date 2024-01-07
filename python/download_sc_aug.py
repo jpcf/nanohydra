@@ -36,8 +36,6 @@ Xval   = Xval.astype(np.float32)
 Xtest  = Xtest.astype(np.float32)
 Ytrain = Ytrain
 
-plt.figure(1)
-plt.plot(Xtest[0,:])
 plt.show()
 # Call garbage collector on useless arrays
 del Ytest 
@@ -79,7 +77,7 @@ for cl in range(NUM_CLASSES):
 
     if(cl == 0):
         # Model instantiation, only used to perform the transforms
-        model  = NanoHydra(input_length=Xmfcc.shape[2], num_channels=NUM_MFCC_CHANS, k=K, g=G, max_dilations=D, dist="binomial", classifier="Logistic", scaler="Sparse", seed=1002, dtype=np.float32)    
+        model  = NanoHydra(input_length=Xmfcc.shape[2], num_channels=NUM_MFCC_CHANS, k=K, g=G, max_dilations=D, dist="binomial", classifier="Logistic", scaler="Sparse", seed=19930111, dtype=np.float32)    
 
     print(f"Hydra-Transforming Class {cl}...")
     Xtr  = model.forward_batch(Xmfcc.astype(np.float32), 200, do_fit=False, do_scale=False)

@@ -31,22 +31,18 @@ if(SHOW_HISTOGRAMS):
     plt.hist(Ytrain, bins=12)
     plt.show()
 
-X0 = Xtrain[class_loc[0], :].astype(np.float32)/(2**15-1)
-X10 = Xtrain[class_loc[10], :].astype(np.float32)/(2**15-1)
+X = {}
 
-X0_mfcc = transform_mfcc(X0[np.random.choice(len(X0), 10),:])
-X10_mfcc = transform_mfcc(X10[np.random.choice(len(X10), 10),:])
+alpha = 0.97
+print(f"Performing pre-emphasis (alpha={alpha})...")
+Xtrain = Xtrain[:,1:] - alpha*Xtrain[:,:-1]
 
-#print(f"O {X0_mfcc[0].shape}")
-#print(f"M {np.mean(X0_mfcc[0], axis=1).shape}")
-#X0_mfcc[1] = X0_mfcc[0]-np.mean(X0_mfcc[0], axis=1)[:,np.newaxis]
-#X0_mfcc[1] /= np.std(X0_mfcc[0], axis=1)[:,np.newaxis]
-#
-#show_mfcc(X0_mfcc[0], "Class 0", 0)
-#show_mfcc(X0_mfcc[1], "Class 0", 1)
-#show_mfcc(X10_mfcc[0], "Class 10", 2)
-#show_mfcc(X10_mfcc[1], "Class 10", 3)
-plt.show()
+for n in range(10):
+    for i in range(12):
+        print(f"Class {i}")
+        X[i] = Xtrain[class_loc[i], :].astype(np.float32)#/(2**15-1)
+        transform_mfcc(X[i][n*10:n*10+1])
+        plt.show()
 
 #Xbackground = Xtrain[class_loc[11]]
 #print(f"Shape of Xbackground: {Xbackground.shape}")

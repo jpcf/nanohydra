@@ -73,13 +73,13 @@ if __name__ == "__main__":
                 
 
         # Initialize the kernel transformer, scaler and classifier
-        model  = NanoHydra(input_length=input_length, num_channels=1, k=8, g=64, max_dilations=10, dist="binomial", classifier="Logistic", scaler="Sparse", seed=int(time.time()), dtype=np.float32, verbose=False)    
+        model  = NanoHydra(input_length=input_length, num_channels=1, k=8, g=8, max_dilations=8, dist="binomial", classifier="Logistic", scaler="Sparse", seed=int(time.time()), dtype=np.float32, verbose=False)    
 
         # Transform and scale
         print(f"Transforming {Xtrain.shape[0]} training examples...")
         Xt = model.load_transform(ds, "./work", "train") 
         if(Xt is None or not USE_CACHED):
-            Xt  = model.forward_batch(Xtrain, 100, do_fit=True)
+            Xt  = model.forward_batch(Xtrain, 100, do_fit=True, do_scale=True)
             model.save_transform(Xt, ds, "./work", "train")
         else:
             print("Using cached transform...")
@@ -123,7 +123,7 @@ if __name__ == "__main__":
         print(f"Transforming Test Fold...")
         Xt = model.load_transform(ds, "./work", "test") 
         if(Xt is None) or not USE_CACHED:
-            Xt  = model.forward_batch(Xtest, 100, do_fit=False)
+            Xt  = model.forward_batch(Xtest, 100, do_scale=True)
             model.save_transform(Xt, ds, "./work", "test")
         else:
             print("Using cached transform...")

@@ -18,11 +18,11 @@ from nanohydra.utils import vs_creator
 BATCH_TRAIN = True
 BATCH_SIZE  = 32
 
-DO_EXPERIMENT_W12 = False
+DO_EXPERIMENT_W12 = True
 DO_EXPERIMENT_W2  = False
-DO_EXPERIMENT_W11 = True
+DO_EXPERIMENT_W11 = False
 
-DO_SHOW_FEATURES = True
+DO_SHOW_FEATURES = False
 
 CLASS_SILENCE = 10
 CLASS_UNKNOWN = 11
@@ -36,7 +36,7 @@ if __name__ == "__main__":
     start = time.perf_counter()
 
     # Initialize the kernel transformer, scaler and classifier
-    model  = NanoHydra(input_length=100, num_channels=8, k=8, g=32, max_dilations=D, dist="normal", classifier="Logistic", scaler="Sparse", seed=1002)    
+    model  = NanoHydra(input_length=100, num_channels=8, k=8, g=32, max_dilations=D, dist="normal", classifier="Logistic", scaler="Sparse", seed=19930111)    
 
     # For debugging, visualize the feature image
     Ximg = np.empty((12000, 8192))
@@ -92,7 +92,7 @@ if __name__ == "__main__":
         plt.show()
 
     # Initialize the kernel transformer, scaler and classifier
-    model  = NanoHydra(input_length=Xtrain.shape[1], num_channels=8, k=8, g=32, max_dilations=D, dist="normal", classifier="Logistic", scaler="Sparse", seed=1002)    
+    model  = NanoHydra(input_length=Xtrain.shape[1], num_channels=8, k=8, g=32, max_dilations=D, dist="normal", classifier="Logistic", scaler="Sparse", seed=19930111)    
 
     # Prepare the Train+Val split
     #val_split_idx = [-1]*len(Xtrain) + [0]*len(Xval)
@@ -106,13 +106,15 @@ if __name__ == "__main__":
     #Xval = model.load_transform(f"SpeechCommands_300", "./work", "val")
     (__, __), (__, Ytest), (__, Yval) = tfds.as_numpy(tfds.load('speech_commands', split=['train', 'test', 'validation'], batch_size=-1, as_supervised=True))
 
-    #Xtrain = np.concatenate([Xtrain, Xval])
-    #Ytrain = np.concatenate([Ytrain, Yval])
 
     print("Loading the validation set")
     Xval = model.load_transform(f"SpeechCommands_300", "./work", "val")
     print("Loading the test set")
     Xtest = model.load_transform(f"SpeechCommands_300", "./work", "test")
+
+    # Add valiation data to training data, in preparation of final training.
+    #Xtrain = np.concatenate([Xtrain, Xval])
+    #Ytrain = np.concatenate([Ytrain, Yval])
 
     model.fit_classifier(Xtrain, Ytrain)
     #model.fit_tf_classifier(Xtrain, Ytrain, Xval, Yval)
@@ -130,11 +132,11 @@ if __name__ == "__main__":
 
     # Score the classifier
     score_man = model.score_manual(Ypred, Ytest, "subset")
-    print(f"Score    for 'Speech Commands v0.0.3': {100*score_man:0.02f} %") 	
+    print(f"Score  (test) for 'Speech Commands v0.0.3': {100*score_man:0.02f} %") 	
     score_man = model.score_manual(Ypred_val, Yval, "subset")
-    print(f"Score (val) for 'Speech Commands v0.0.3': {100*score_man:0.02f} %") 	
+    print(f"Score (valid) for 'Speech Commands v0.0.3': {100*score_man:0.02f} %") 	
     score_man = model.score_manual(Ypred_train, Ytrain, "subset")
-    print(f"Score (val) for 'Speech Commands v0.0.3': {100*score_man:0.02f} %") 	
+    print(f"Score (train) for 'Speech Commands v0.0.3': {100*score_man:0.02f} %") 	
 
     cm = confusion_matrix(Ytest, Ypred, labels=model.cfg.get_classf().classes_)
     # Show accuracy instead of abs count of samples

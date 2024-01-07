@@ -1,7 +1,7 @@
 import numpy as np
 
 from librosa import display
-from librosa.feature import mfcc
+from librosa.feature import mfcc, melspectrogram
 from scipy.signal.windows import hann
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -21,7 +21,7 @@ def vs_creator(X, Y, class_to_elim, method="onevsall"):
         assert False, f"Unknown Method Chosen: '{method}'"
 
 def transform_mfcc(X, fs=16000):
-    N_MFCC = 20 
+    N_MFCC = 40 
     N_MFCC_USED = 8
     NORM_MINMAX = False
 
@@ -43,6 +43,7 @@ def transform_mfcc(X, fs=16000):
             X_mfcc[i,:,:] -= mean
             X_mfcc[i,:,:] /= std 
 
+
         #show_mfcc(X_mfcc[i,:,:], "Class Tresholded", 1)
         for n in range(len(X_mfcc[i,0,:])):
             if(X_mfcc[i,0,n] <= 0.0):
@@ -56,7 +57,6 @@ def transform_mfcc(X, fs=16000):
         #plt.show()
         #plt.plot(outline)
         #plt.show()
-
 
     # Make sure all sizes are consistent
     assert X.shape[0] == X_mfcc.shape[0], f"The output dataset {X_mfcc.shape[0]} does not have the same number of examples as the original dataset{X.shape[0]}"
@@ -98,7 +98,7 @@ def augment_data_of_class(X, Xbackground, factor, add_noise=True):
     FS = 16000
 
     # Variable Params
-    MAX_SHIFT = 0.2
+    MAX_SHIFT = 0.15
     MAX_BACKGROUND_VOL = 0.1
 
     # Calculable params

@@ -10,23 +10,23 @@ X  = {'test': {}, 'train': {}}
 y  = {'test': {}, 'train': {}}
 
 CSV_PATH = "./data/results_ucr112_variants.csv"
-BEST_OF      = 40
+BEST_OF      = 10
 
 def training_round(Xtrain, Xtest, Ytrain, Ytest, k=8, g=64, seed=None):
 
-    input_length = Xtrain.shape[1]
+    input_length = Xtrain.shape[2]
 
     # Initialize Model 
-    model  = NanoHydra(input_length=input_length, k=k,g=g, dist="binomial", classifier="Logistic", seed=seed)    
+    model  = NanoHydra(input_length=input_length, k=k,g=g, max_dilations=10, dist="binomial", classifier="Logistic", seed=seed, scaler="Sparse", dtype=np.float32, verbose=False)    
 
     # Perform Transform on Training Values
-    Xt  = model.forward_batch(Xtrain, 500, do_fit=False)
+    Xt  = model.forward_batch(Xtrain, 500, do_fit=True, do_scale=True)
 
     # Train the classifier with the transformed input
     model.fit_classifier(Xt, Ytrain)
 
     # Perform Transform on Testing Values
-    Xt  = model.forward_batch(Xtest, 500, do_fit=False)
+    Xt  = model.forward_batch(Xtest, 500, do_fit=False, do_scale=True)
 
     # Score the predictions
     score = model.score(Xt, Ytest)
@@ -36,14 +36,14 @@ def training_round(Xtrain, Xtest, Ytrain, Ytest, k=8, g=64, seed=None):
 def load_dataset(dataset):
 
     for sp in ["test", "train"]:
-        X[sp][ds],y[sp][ds]  = load_ucr_ds(ds, split=sp, return_type="numpy2d")
+        X[sp][ds],y[sp][ds]  = load_ucr_ds(ds, split=sp, return_type="numpy3d")
 
     # The split argument splits into the opposite fold. Therefore, we here cross them back
     # together into the correct one.
-    Xtrain = X['test'][ds].astype(np.float32)
-    Xtest  = X['train'][ds].astype(np.float32)
-    Ytrain = y['test'][ds].astype(np.float32)
-    Ytest  = y['train'][ds].astype(np.float32)
+    Xtrain = X['train'][ds].astype(np.float32)
+    Xtest  = X['test'][ds].astype(np.float32)
+    Ytrain = y['train'][ds].astype(np.float32)
+    Ytest  = y['test'][ds].astype(np.float32)
 
     return Xtrain, Xtest, Ytrain, Ytest
 
@@ -89,20 +89,23 @@ if __name__ == "__main__":
 
     else:
         ds = sys.argv[1]
-        ds_idx = csv.index[csv['dataset'] == ds].to_list()[0]
+        #ds_idx = csv.index[csv['dataset'] == ds].to_list()[0]
 
         Xtrain, Xtest, Ytrain, Ytest = load_dataset(ds)
 
         f = open(f"results_many_runs_{ds}.txt", "w")
-        f.write(f"Author:{100*csv['Hydra'][ds_idx]}\n")
-        best_score = 0.0
+        #f.write(f"Author:{100*csv['Hydra'][ds_idx]}\n")
+        scores = []
         for i in range(BEST_OF): 
             start = time.perf_counter()
 
-            score = training_round(Xtrain, Xtest, Ytrain, Ytest, 8, 8, seed=i)
+            score = training_round(Xtrain, Xtest, Ytrain, Ytest, 8, 16, seed=i)
             print(f"Score for '{ds}': {100*score:0.02f} %") 	
             f.write(f"{100*score}\n")
             f.flush()
-            best_score = max(best_score, score)
+            scores.append(100*score)
 
             print(f"Execution of '{ds}' took {time.perf_counter()-start} seconds")
+
+        
+        print(f"Accuracy stats: {np.mean(scores):.2f} +/- {np.std(scores):.3f}. Best: {np.max(scores):.2f}, Worse: {np.min(scores):.2f}")

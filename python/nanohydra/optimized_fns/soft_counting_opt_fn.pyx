@@ -24,7 +24,7 @@ def soft_counting_opt(cnp.ndarray[DTYPE_UINT32_t, ndim=3] args, cnp.ndarray[DTYP
     cdef cnp.ndarray[DTYPE_FLOAT32_t, ndim=3] feats = np.zeros([num_examples, num_groups, kernels_per_group], dtype=DTYPE_FLOAT32)
 
     with nogil:
-        for ex in prange(num_examples, schedule='static', num_threads=16):
+        for ex in prange(num_examples, schedule='static', num_threads=22):
             for gr in range(num_groups):
                 for s in range(num_samples):
                     optim = optims[ex,gr,s]
