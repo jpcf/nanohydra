@@ -16,8 +16,7 @@ from   tensorflow.keras.losses    import SparseCategoricalCrossentropy
 
 from .optimized_fns.conv1d_opt_x_f32_w_f32        import conv1d_opt_x_f32_w_f32
 from .optimized_fns.conv1d_opt_x_int16_w_b1       import conv1d_opt_x_int16_w_b1
-from .optimized_fns.hard_counting_opt import hard_counting_opt
-from .optimized_fns.soft_counting_opt import soft_counting_opt
+from .optimized_fns.combined_counting_opt         import combined_counting_opt
 
 WORK_FOLDER = "./work/"
 
@@ -221,7 +220,6 @@ class NanoHydra():
 
             for diff_index in range(self.divisor):
 
-
                 feats = [None for i in range(self.num_channels)]
                 
                 for channel in range(self.num_channels):
@@ -240,18 +238,18 @@ class NanoHydra():
 
                     # Create a feature vector of size (num_groups, num_kernels) where each of the num_kernels position contains
                     # the count for the respective kernel with that index.
-                    feats_hard_max = soft_counting_opt(max_indices, max_values, kernels_per_group=self.k)
-                    feats_hard_min = hard_counting_opt(min_indices,             kernels_per_group=self.k)
+                    #feats_hard_max = soft_counting_opt(max_indices, max_values, kernels_per_group=self.k)
+                    #feats_hard_min = hard_counting_opt(min_indices,             kernels_per_group=self.k)
+                    #feats_hard_max = feats_hard_max.reshape((num_examples, self.h*self.k))
+                    #feats_hard_min = feats_hard_min.reshape((num_examples, self.h*self.k))
+                    #feats[channel] = np.concatenate((feats_hard_max, feats_hard_min), axis=1)
 
-                    feats_hard_max = feats_hard_max.reshape((num_examples, self.h*self.k))
-                    feats_hard_min = feats_hard_min.reshape((num_examples, self.h*self.k))
-
-                    feats[channel] = np.concatenate((feats_hard_max, feats_hard_min), axis=1)
+                    feats[channel] = combined_counting_opt(max_indices, min_indices, max_values, min_values, kernels_per_group=self.k).reshape((num_examples, 2*self.h*self.k))
 
                 if(self.num_channels==1):
                     feats_diff[diff_index] = feats[0]
                 else:
-                    feats_diff[diff_index] = np.concatenate((feats[i] for i in range(self.num_channels)), axis=1)
+                    feats_diff[diff_index] = np.concatenate((feats[0], feats[1], feats[2], feats[3],feats[4], feats[5], feats[6], feats[7]), axis=1)
 
             feats_dil = np.concatenate((feats_diff[0], feats_diff[1]), axis=1)
 
@@ -296,6 +294,9 @@ class NanoHydra():
             return None
 
         return Z
+
+    def dump_weights(self):
+        return self.W.reshape((self.h*self.k, self.__KERNEL_LEN))
 
     def fit_classifier(self, X, Y):
         self.cfg.get_classf().fit(X,Y)
