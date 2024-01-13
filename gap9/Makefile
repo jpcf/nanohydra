@@ -40,7 +40,7 @@ CFLAGS+=-DLOOP_COLLAPSE=$(LOOP_COLLAPSE)
 endif 
 
 
-run_python_c_equiv_test:
+run_python_c_equiv_test: forward_equivalence_check
 	$(PYTHONPATH) test/model_equivalence_check.py
 
 $(BUILDPATH)/hydra_convolve.o: 
@@ -56,7 +56,7 @@ $(BUILDPATH)/hydra_utils.o:
 	$(CC) $(CFLAGS) -c $(SRCPATH)/hydra_utils.c -o $(BUILDPATH)/hydra_utils.o 
 
 forward_equivalence_check: $(BUILDPATH)/hydra_convolve.o  $(BUILDPATH)/hydra_forward.o $(BUILDPATH)/hydra_reset.o $(BUILDPATH)/hydra_utils.o
-	$(CC) $(CFLAGS) -fopenmp $(TESTPATH)/forward_equivalence_check.c -o $(DISTPATH)/forward_equivalence_check $(BUILDPATH)/hydra_forward.o $(BUILDPATH)/hydra_convolve.o $(BUILDPATH)/hydra_utils.o -lm
+	$(CC) $(CFLAGS) -fopenmp $(TESTPATH)/forward_equivalence_check.c -o $(DISTPATH)/forward_equivalence_check $(BUILDPATH)/hydra_forward.o $(BUILDPATH)/hydra_convolve.o $(BUILDPATH)/hydra_utils.o $(BUILDPATH)/hydra_reset.o -lm
 
 clean:
 	rm -rf $(BUILDPATH)

@@ -6,7 +6,7 @@ void hydra_convolve(int16_t *inX, int16_t ***inW, int16_t *featVec, uint8_t dil,
     uint16_t  xi;
     int32_t   conv_out = 0;
     int16_t   max, min;
-    uint16_t  argmax, argmin;
+    uint16_t  argmax=0, argmin=0;
 
     for(h=0; h < H; h++) {
         for(xi=0; xi < lenX; xi += 1) {
@@ -39,7 +39,7 @@ void hydra_convolve(int16_t *inX, int16_t ***inW, int16_t *featVec, uint8_t dil,
                 }
             }
 
-            // Hard count and **NOT USED** soft count 
+            // Hard count and soft count 
             featVec[h*K*F + argmax*F + 0] += max;
             featVec[h*K*F + argmin*F + 1] += 1;
         }
