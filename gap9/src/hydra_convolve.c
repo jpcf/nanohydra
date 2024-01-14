@@ -1,6 +1,6 @@
-#include <stdint.h>
+#include "../include/hydra.h"
 
-void hydra_convolve(int16_t *inX, int16_t ***inW, int16_t *featVec, uint8_t dil, uint16_t lenX, uint8_t lenW, uint8_t lenXpad, uint8_t H, uint8_t K, uint8_t F) {
+void hydra_convolve(int16_t *inX, int16_t ***inW, int16_t *featVec, uint8_t dil, Hydra* hydra, uint8_t curr_diff) {
 
     uint8_t   h,k,wi;
     uint16_t  xi;
@@ -8,22 +8,22 @@ void hydra_convolve(int16_t *inX, int16_t ***inW, int16_t *featVec, uint8_t dil,
     int16_t   max, min;
     uint16_t  argmax=0, argmin=0;
 
-    for(h=0; h < H; h++) {
-        for(xi=0; xi < lenX; xi += 1) {
+    for(h=0; h < hydra->H; h++) {
+        for(xi=0; xi < hydra->lenX - curr_diff; xi += 1) {
             // Reset the max and min
             max = INT16_MIN;
             min = INT16_MAX; 
 
             // Iterate over kernels in given group
-            for(k=0; k < K; k++) {
+            for(k=0; k < hydra->K; k++) {
                 // Reset the convolutional output buffer, 
                 conv_out = 0;
                 
                 // Convolve for the current X point. Doing it this way prevents the need to keep the full convolutional
                 // output in memory, since each convolutional output is independent of the others. This is a possible point
                 // for using SIMD.
-                for(wi=0; wi < lenW; wi++) {
-                    conv_out += (int32_t)(inX[xi+lenXpad+(wi-4)*(dil+1)] * inW[h][k][wi]);
+                for(wi=0; wi < hydra->lenW; wi++) {
+                    conv_out += (int32_t)(inX[xi+hydra->lenXpad+(wi-4)*(dil+1)] * inW[h][k][wi]);
                 }
 
                 // Determine if convolutional output is the new winning/losing kernel
@@ -40,8 +40,8 @@ void hydra_convolve(int16_t *inX, int16_t ***inW, int16_t *featVec, uint8_t dil,
             }
 
             // Hard count and soft count 
-            featVec[h*K*F + argmax*F + 0] += max;
-            featVec[h*K*F + argmin*F + 1] += 1;
+            featVec[h*hydra->K*hydra->N_feats + argmax*hydra->N_feats + 0] += max;
+            featVec[h*hydra->K*hydra->N_feats + argmin*hydra->N_feats + 1] += 1;
         }
     }
 }

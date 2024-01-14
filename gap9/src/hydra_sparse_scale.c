@@ -1,6 +1,6 @@
+#include "../include/hydra.h"
 
-
-void hydra_sparse_scale(int16_t featVec, float16_t featMean, float16_t featStd, uint16_t lenFeatVec) {
+void hydra_sparse_scale(int16_t featVec, float featMean, float featStd, uint16_t lenFeatVec) {
 
     float16_t temp;
 

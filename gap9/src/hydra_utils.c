@@ -1,5 +1,4 @@
-#include <stdint.h>
-#include <math.h>
+#include "../include/hydra.h"
 
 uint16_t padding_len(uint16_t lenW, uint16_t dilation) {
     return (lenW / 2) * (dilation+1) + 1;

@@ -107,7 +107,7 @@ class NanoHydra():
 
         max_exponent = np.log2((input_length - 1) / (self.__KERNEL_LEN - 1))
 
-        self.dilations = np.array(2 ** np.arange(int(max_exponent)), dtype=np.int32)[:max_dilations]
+        self.dilations = np.array(2 ** np.arange(int(max_exponent)), dtype=np.int32)[:max_dilations-1]
         self.dilations = np.insert(self.dilations, 0, 0)
         self.num_dilations = len(self.dilations)
 
@@ -223,18 +223,21 @@ class NanoHydra():
                 feats = [None for i in range(self.num_channels)]
                 
                 for channel in range(self.num_channels):
+                    print(f"Dil={dilation_index}, Diff={diff_index}, Chan={channel}")
                     _X = X[:,channel,:] if diff_index == 0 else diff_X[:,channel,:]
 
                     # Perform convolution on all kernels of a given dilation
                     #print(f"Current Dilation: {d}")
-                    #_Z = conv1d_opt_x_int16_w_b1(_X, self.W, dilation = d)
-                    _Z = conv1d_opt_x_f32_w_f32(_X, self.W, dilation = d)
+                    _Z = conv1d_opt_x_int16_w_b1(_X, self.W, dilation = d)
+                    #_Z = conv1d_opt_x_f32_w_f32(_X, self.W, dilation = d)
 
                     # For each example, calculate the (arg)max/min over the k kernels of a given group.
                     # Here we should "collapse" the second dimension of the tensor, where the kernel indices are.
                     # Both return vectors should have dimensions (num_examples, num_groups, input_len)
                     max_values, max_indices = np.max(_Z, axis=2).astype(np.float32), np.argmax(_Z, axis=2).astype(np.uint32)
                     min_values, min_indices = np.min(_Z, axis=2).astype(np.float32), np.argmin(_Z, axis=2).astype(np.uint32)
+
+                    print(max_values)
 
                     # Create a feature vector of size (num_groups, num_kernels) where each of the num_kernels position contains
                     # the count for the respective kernel with that index.
