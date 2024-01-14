@@ -19,9 +19,6 @@ void hydra_convolve(int16_t *inX, int16_t ***inW, int16_t *featVec, uint8_t dil,
                 // Reset the convolutional output buffer, 
                 conv_out = 0;
                 
-                // Convolve for the current X point. Doing it this way prevents the need to keep the full convolutional
-                // output in memory, since each convolutional output is independent of the others. This is a possible point
-                // for using SIMD.
                 for(wi=0; wi < hydra->lenW; wi++) {
                     conv_out += (int32_t)(inX[xi+hydra->lenXpad+(wi-4)*(dil+1)] * inW[h][k][wi]);
                 }

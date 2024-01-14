@@ -49,14 +49,17 @@ $(BUILDPATH)/hydra_convolve.o:
 $(BUILDPATH)/hydra_forward.o: 
 	$(CC) $(CFLAGS) -c $(SRCPATH)/hydra_forward.c -o $(BUILDPATH)/hydra_forward.o
 
+$(BUILDPATH)/hydra_init.o: 
+	$(CC) $(CFLAGS) -c $(SRCPATH)/hydra_init.c -o $(BUILDPATH)/hydra_init.o
+
 $(BUILDPATH)/hydra_reset.o: 
 	$(CC) $(CFLAGS) -c $(SRCPATH)/hydra_reset.c -o $(BUILDPATH)/hydra_reset.o
 
 $(BUILDPATH)/hydra_utils.o: 
 	$(CC) $(CFLAGS) -c $(SRCPATH)/hydra_utils.c -o $(BUILDPATH)/hydra_utils.o 
 
-forward_equivalence_check: $(BUILDPATH)/hydra_convolve.o  $(BUILDPATH)/hydra_forward.o $(BUILDPATH)/hydra_reset.o $(BUILDPATH)/hydra_utils.o
-	$(CC) $(CFLAGS) -fopenmp $(TESTPATH)/forward_equivalence_check.c -o $(DISTPATH)/forward_equivalence_check $(BUILDPATH)/hydra_forward.o $(BUILDPATH)/hydra_convolve.o $(BUILDPATH)/hydra_utils.o $(BUILDPATH)/hydra_reset.o -lm
+forward_equivalence_check: $(BUILDPATH)/hydra_convolve.o  $(BUILDPATH)/hydra_forward.o $(BUILDPATH)/hydra_reset.o $(BUILDPATH)/hydra_utils.o $(BUILDPATH)/hydra_init.o
+	$(CC) $(CFLAGS) -fopenmp $(TESTPATH)/forward_equivalence_check.c -o $(DISTPATH)/forward_equivalence_check $(BUILDPATH)/hydra_forward.o $(BUILDPATH)/hydra_convolve.o $(BUILDPATH)/hydra_utils.o $(BUILDPATH)/hydra_reset.o $(BUILDPATH)/hydra_init.o -lm
 
 clean:
 	rm -rf $(BUILDPATH)

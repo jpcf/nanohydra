@@ -9,7 +9,7 @@ INPUT_LEN = 140
 NUM_CHAN  = 1
 K=8
 G=16
-MAX_DILATIONS = 4
+MAX_DILATIONS = 5
 
 def check_rck_output(Y, Yc):
     for s in range(Y.shape[0]):
@@ -64,7 +64,10 @@ os.system("./dist/forward_equivalence_check")
 Yc = []
 with open("dist/output.txt", "r") as f:
     for line in f.readlines():
-        Yc.append(np.array(line.split(",")[:-1]).astype(np.int32))
+        Yc.append(np.array(line.split(",")[:-1]).astype(np.int16))
+
+print(Y[0,-20:])
+print(Yc[0][-20:])
 
 check_rck_output(Y, Yc)
 
