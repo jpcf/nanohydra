@@ -11,6 +11,9 @@ typedef struct Hydra {
     int16_t   **inX_diff;
     int16_t  ***inW;
     int16_t    *featVec;
+    int16_t   **classf_weights;
+    int16_t    *classf_bias;
+    int16_t    *classf_scores;
 
     // Attributes
     uint16_t lenX;  
@@ -24,6 +27,10 @@ typedef struct Hydra {
     uint8_t  N_chan; 
     uint8_t  N_feats;
     uint16_t len_feat_vec;
+
+    // Classifier Attributes
+    uint8_t N_classes;
+
 } Hydra;
 
 Hydra* hydra_init(
@@ -34,7 +41,8 @@ Hydra* hydra_init(
     uint8_t   N_dil,
     uint8_t   N_diff,
     uint8_t   N_chan, 
-    uint8_t   N_feats);
+    uint8_t   N_feats,
+    uint8_t   N_classes);
 
 void hydra_reset(Hydra *hydra);
 
@@ -49,6 +57,8 @@ void hydra_convolve(int16_t   *inX,
 void hydra_forward(Hydra *hydra);
 
 void hydra_sparse_scale(int16_t featVec, float featMean, float featStd, uint16_t lenFeatVec); 
+
+void hydra_classifier(Hydra* hydra);
 
 uint16_t padding_len(uint16_t lenW, uint16_t dilation);
 

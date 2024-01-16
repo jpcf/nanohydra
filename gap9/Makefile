@@ -39,9 +39,14 @@ ifdef LOOP_COLLAPSE
 CFLAGS+=-DLOOP_COLLAPSE=$(LOOP_COLLAPSE)
 endif 
 
-
-run_python_c_equiv_test: forward_equivalence_check
+run_forward_equiv_test: forward_equivalence_check
 	$(PYTHONPATH) test/model_equivalence_check.py
+
+run_classf_equiv_test: classf_equivalence_check
+	$(PYTHONPATH) test/classf_equivalence_check.py
+
+$(BUILDPATH)/hydra_classifier.o: 
+	$(CC) $(CFLAGS) -c $(SRCPATH)/hydra_classifier.c -o $(BUILDPATH)/hydra_classifier.o
 
 $(BUILDPATH)/hydra_convolve.o: 
 	$(CC) $(CFLAGS) -c $(SRCPATH)/hydra_convolve.c -o $(BUILDPATH)/hydra_convolve.o
@@ -60,6 +65,9 @@ $(BUILDPATH)/hydra_utils.o:
 
 forward_equivalence_check: $(BUILDPATH)/hydra_convolve.o  $(BUILDPATH)/hydra_forward.o $(BUILDPATH)/hydra_reset.o $(BUILDPATH)/hydra_utils.o $(BUILDPATH)/hydra_init.o
 	$(CC) $(CFLAGS) -fopenmp $(TESTPATH)/forward_equivalence_check.c -o $(DISTPATH)/forward_equivalence_check $(BUILDPATH)/hydra_forward.o $(BUILDPATH)/hydra_convolve.o $(BUILDPATH)/hydra_utils.o $(BUILDPATH)/hydra_reset.o $(BUILDPATH)/hydra_init.o -lm
+
+classf_equivalence_check: $(BUILDPATH)/hydra_classifier.o $(BUILDPATH)/hydra_reset.o $(BUILDPATH)/hydra_init.o $(BUILDPATH)/hydra_utils.o
+	$(CC) $(CFLAGS) -fopenmp $(TESTPATH)/classf_equivalence_check.c -o $(DISTPATH)/classf_equivalence_check $(BUILDPATH)/hydra_classifier.o $(BUILDPATH)/hydra_reset.o $(BUILDPATH)/hydra_init.o $(BUILDPATH)/hydra_utils.o -lm
 
 clean:
 	rm -rf $(BUILDPATH)
