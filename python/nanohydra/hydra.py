@@ -7,6 +7,8 @@ import h5py
 import os
 import gc
 from tqdm import tqdm
+import sys
+import copy
 
 import tensorflow.keras as tf
 from   tensorflow.keras           import Sequential, regularizers
@@ -17,6 +19,10 @@ from   tensorflow.keras.losses    import SparseCategoricalCrossentropy
 from .optimized_fns.conv1d_opt_x_f32_w_f32        import conv1d_opt_x_f32_w_f32
 from .optimized_fns.conv1d_opt_x_int16_w_b1       import conv1d_opt_x_int16_w_b1
 from .optimized_fns.combined_counting_opt         import combined_counting_opt
+
+# Adding Hydra Model Path
+sys.path.append('/home/josefonseca/Documents/embrocket/python/mlutils')
+from mlutils.quantizer import LayerQuantizer
 
 WORK_FOLDER = "./work/"
 
@@ -176,29 +182,33 @@ class NanoHydra():
         else:
             Xs = X
         self.cfg.get_scaler().fit(Xs)
+        self.cfg.get_scaler().quantize()
 
-    def forward_scaler(self, X):
-        return self.cfg.get_scaler().transform(X)
+    def forward_scaler(self, X, quantize=False):
+        if(quantize):
+            return self.cfg.get_scaler().transform_quant(X)
+        else:
+            return self.cfg.get_scaler().transform(X)
 
     # transform in batches of *batch_size*
-    def forward_batch(self, X, batch_size = 256, do_fit=True, do_scale=False):
+    def forward_batch(self, X, batch_size = 256, do_fit=True, do_scale=False, quantize_scaler = False, frac_bit_shift = 6):
         num_examples = X.shape[0]
         len_feat_vec = 2*self.k * self.g * self.num_dilations * self.num_channels
         #len_feat_vec = self.k * self.g * self.num_dilations * self.num_channels
         Z = np.empty((num_examples, len_feat_vec))
 
         for idx in tqdm(range(0, num_examples, batch_size)):
-            Z[idx:min(idx+batch_size, num_examples), :] = self.forward(X[idx:min(idx+batch_size, num_examples), :, :])
+            Z[idx:min(idx+batch_size, num_examples), :] = self.forward(X[idx:min(idx+batch_size, num_examples), :, :], frac_bit_shift)
 
         if(do_fit):
             self.fit_scaler(Z)
         
         if(do_scale):
-            Z = self.forward_scaler(Z)
+            Z = self.forward_scaler(Z, quantize_scaler)
 
         return Z
 
-    def forward(self, X):
+    def forward(self, X, frac_bit_shift):
 
         num_examples = X.shape[0]
 
@@ -223,21 +233,21 @@ class NanoHydra():
                 feats = [None for i in range(self.num_channels)]
                 
                 for channel in range(self.num_channels):
-                    print(f"Dil={dilation_index}, Diff={diff_index}, Chan={channel}")
+                    #print(f"Dil={dilation_index}, Diff={diff_index}, Chan={channel}")
                     _X = X[:,channel,:] if diff_index == 0 else diff_X[:,channel,:]
 
                     # Perform convolution on all kernels of a given dilation
                     #print(f"Current Dilation: {d}")
-                    _Z = conv1d_opt_x_int16_w_b1(_X, self.W, dilation = d)
-                    #_Z = conv1d_opt_x_f32_w_f32(_X, self.W, dilation = d)
+                    if(self.dtype == np.int16):
+                        _Z = conv1d_opt_x_int16_w_b1(_X, self.W, dilation = d)
+                    else:
+                        _Z = conv1d_opt_x_f32_w_f32(_X, self.W, dilation = d)
 
                     # For each example, calculate the (arg)max/min over the k kernels of a given group.
                     # Here we should "collapse" the second dimension of the tensor, where the kernel indices are.
                     # Both return vectors should have dimensions (num_examples, num_groups, input_len)
-                    max_values, max_indices = np.max(_Z, axis=2).astype(np.float32), np.argmax(_Z, axis=2).astype(np.uint32)
-                    min_values, min_indices = np.min(_Z, axis=2).astype(np.float32), np.argmin(_Z, axis=2).astype(np.uint32)
-
-                    print(max_values)
+                    max_values, max_indices = np.max(_Z, axis=2).astype(np.int32), np.argmax(_Z, axis=2).astype(np.uint32)
+                    min_values, min_indices = np.min(_Z, axis=2).astype(np.int32), np.argmin(_Z, axis=2).astype(np.uint32)
 
                     # Create a feature vector of size (num_groups, num_kernels) where each of the num_kernels position contains
                     # the count for the respective kernel with that index.
@@ -247,7 +257,12 @@ class NanoHydra():
                     #feats_hard_min = feats_hard_min.reshape((num_examples, self.h*self.k))
                     #feats[channel] = np.concatenate((feats_hard_max, feats_hard_min), axis=1)
 
-                    feats[channel] = combined_counting_opt(max_indices, min_indices, max_values, min_values, kernels_per_group=self.k).reshape((num_examples, 2*self.h*self.k))
+                    feats[channel] = combined_counting_opt(max_indices, 
+                                                           min_indices, 
+                                                           max_values, 
+                                                           min_values, 
+                                                           kernels_per_group=self.k, 
+                                                           frac_bit_shift=frac_bit_shift).reshape((num_examples, 2*self.h*self.k))
 
                 if(self.num_channels==1):
                     feats_diff[diff_index] = feats[0]
@@ -303,6 +318,33 @@ class NanoHydra():
 
     def fit_classifier(self, X, Y):
         self.cfg.get_classf().fit(X,Y)
+
+    def quantize_classifier(self, nbits_repr):
+        W = self.cfg.get_classf().coef_
+        b = self.cfg.get_classf().intercept_
+        self.lq = LayerQuantizer(np.concatenate((W.flatten(), b.flatten())), nbits_repr)
+        print(self.lq)
+        self.Wq  = self.lq.quantize(W)
+        self.bq  = self.lq.quantize(b)
+        self.Wdq = self.lq.dequantize(self.Wq)
+        self.bdq = self.lq.dequantize(self.bq)
+        print(f"The Original W: {W}")
+        print(f"Quantized    W: {self.Wq}")
+        print(f"De-Quantized W: {self.Wdq}")
+
+    def dump_classifier_weights(self):
+        return self.Wq, self.bq
+
+    def predict_quantized(self, X):
+        """
+        self.activ = (np.dot(self.Wdq, X.T).T + self.bdq)
+        pred = np.argmax(self.activ, axis=1).astype(np.uint8)+1
+        self.activ
+        """
+        self.activ = (np.dot(self.Wq, X.T).T + self.bq)
+        pred = np.argmax(self.activ, axis=1).astype(np.uint8)+1
+        self.activ
+        return pred
 
     def fit_tf_classifier(self, X, Y, X_val, Y_val):
         early_stopping_cb = EarlyStopping(monitor='val_loss', mode='min', patience=50, restore_best_weights=True)
@@ -369,14 +411,7 @@ class SparseScaler():
 
         X = np.clip(X, a_min=0, a_max=None)
 
-        self.epsilon = np.mean((X == 0), axis=0) ** self.exponent + 1e-8
-        #print(f"self.epsilon: {self.epsilon}")
-
         if self.mask:
-            
-            #print(f"Shape of X  = {X.shape}")
-            #print(f"Shape of m  = {self.mu.shape}")
-            #print(f"Shape of s  = {self.sigma.shape}")
             
             for col in range(X.shape[1]):
                 X[:,col] = (X[:,col] - self.mu[col])*(X[:,col] != 0)
@@ -384,6 +419,30 @@ class SparseScaler():
                 X[:,col] = X[:,col] / self.sigma[col]
 
             return X
+
+    def quantize(self):
+        self.muq    = self.mu.astype(np.int16)
+        self.sigmaq = np.ceil(np.log2(self.sigma)).astype(np.uint16)
+
+    def transform_quant(self, X):
+
+        assert self.fitted, "Not fitted."
+
+        X = np.clip(X, a_min=0, a_max=None).astype(np.int16)
+
+        print(f"X: {X}" )
+        print(f"u: {self.muq}" )
+        print(f"s: {self.sigmaq}")
+
+        if self.mask:
+            
+            for col in range(X.shape[1]):
+                X[:,col] = (X[:,col] - self.muq[col])*(X[:,col] != 0)
+
+            for col in range(X.shape[1]):
+                X[:,col] = X[:,col] / (2**self.sigmaq[col]) # This is equivalent a bitwise shift of sigmaq bits, and rounds to zero
+
+            return X.astype(np.int16)
 
     def fit_transform(self, X):
 

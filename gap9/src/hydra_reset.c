@@ -8,4 +8,9 @@ void hydra_reset(Hydra *hydra) {
     for(i=0; i < hydra->len_feat_vec; i++) {
         hydra->featVec[i] = 0;
     }
+
+    // Reset the classifier score accumulator
+    for(i=0; i < hydra->N_classes; i++) {
+        hydra->classf_scores[i] = 0;
+    }
 }

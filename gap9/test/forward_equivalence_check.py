@@ -5,8 +5,12 @@ sys.path.append('/home/josefonseca/Documents/embrocket/python/')
 from nanohydra.hydra import NanoHydra 
 
 # Test Data and Model Parameters
-FEAT_VEC_LEN = 128
-NUM_CLASSES  = 5
+INPUT_LEN = 140
+NUM_CHAN  = 1
+K=8
+G=16
+MAX_DILATIONS = 5
+CONV_FRAC_BITS = 8
 
 def check_rck_output(Y, Yc):
     for s in range(Y.shape[0]):
@@ -29,36 +33,42 @@ def check_rck_output(Y, Yc):
         else:
             print(f"PASS: No Errors!")
 
+# Import Model
+model = NanoHydra(input_length=INPUT_LEN, 
+                  num_channels=NUM_CHAN, 
+                  k=K, g=G, 
+                  max_dilations=MAX_DILATIONS, 
+                  dist="binomial", 
+                  classifier="Logistic", 
+                  scaler="Sparse", 
+                  seed=3213)
 
 # Randomize input data, and dump it to file
-rng = np.random.default_rng(seed=23123)
-X = rng.integers(low=-2**9, high=2**9, size=(FEAT_VEC_LEN)).astype(np.int16)
+rng = np.random.default_rng(seed=42)
+X = rng.integers(low=-2**10, high=2**10, size=(1,1,INPUT_LEN)).astype(np.int16)
 
-with open("dist/input_featvec.txt", "w") as f:
-    f.write(",".join([str(x) for x in X])+"\n")
+with open("dist/input.txt", "w") as f:
+    f.write(",".join([str(x) for x in X[0][0]])+"\n")
 
 # Dump Convolution weights to file, and produce the expected output
-W = rng.integers(low=-2**4, high=2**4, size=(NUM_CLASSES, FEAT_VEC_LEN)).astype(np.int16)
-b = rng.integers(low=-100, high=100, size=(NUM_CLASSES)).astype(np.int16)
-Y = np.dot(W,X) + b
-print(Y)
+W = model.dump_weights()
+Y = model.forward(X, CONV_FRAC_BITS).astype(np.int16)
 
-with open("dist/weights_classf.txt", "w") as f:
+with open("dist/weights.txt", "w") as f:
     for wline in W:
-        f.write(",".join([str(w) for w in wline])+",\n")
-
-with open("dist/bias_classf.txt", "w") as f:
-    f.write(",".join([str(bv) for bv in b])+",\n")
+        f.write(",".join([str(w) for w in wline])+"\n")
 
 # Run C model, which will dump the output feature vector 
-os.system("./dist/classf_equivalence_check")
-#
+os.system("./dist/forward_equivalence_check")
+
 # Read the output feature vector produced by the C model
 Yc = []
-with open("./dist/output.txt", "r") as f:
+with open("dist/output.txt", "r") as f:
     for line in f.readlines():
         Yc.append(np.array(line.split(",")[:-1]).astype(np.int16))
 
-print(Yc)
-check_rck_output(Y.reshape((1,NUM_CLASSES)), Yc)
+print(Y[0,-20:])
+print(Yc[0][-20:])
+
+check_rck_output(Y, Yc)
 

@@ -37,7 +37,7 @@ void hydra_convolve(int16_t *inX, int16_t ***inW, int16_t *featVec, uint8_t dil,
             }
 
             // Hard count and soft count 
-            featVec[h*hydra->K*hydra->N_feats + argmax*hydra->N_feats + 0] += max;
+            featVec[h*hydra->K*hydra->N_feats + argmax*hydra->N_feats + 0] += max >> hydra->conv_frac_bit_shift;
             featVec[h*hydra->K*hydra->N_feats + argmin*hydra->N_feats + 1] += 1;
         }
     }

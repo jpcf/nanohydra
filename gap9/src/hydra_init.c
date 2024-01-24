@@ -9,7 +9,8 @@ Hydra* hydra_init(
     uint8_t    N_diff,
     uint8_t    N_chan, 
     uint8_t    N_feats,
-    uint8_t    N_classes) {
+    uint8_t    N_classes,
+    uint8_t    conv_frac_bit_shift) {
 
     // Declare pointer to hydra struct
     Hydra *hydra;
@@ -26,6 +27,7 @@ Hydra* hydra_init(
     hydra->N_diff    = N_diff;
     hydra->N_chan    = N_chan;
     hydra->N_classes = N_classes;
+    hydra->conv_frac_bit_shift =conv_frac_bit_shift;
 
     // Calculated attributes
     hydra->H       = hydra->G/2;
@@ -58,8 +60,12 @@ Hydra* hydra_init(
     // Allocate feature vector
     hydra->featVec = (int16_t*) malloc(sizeof(int16_t) * hydra->len_feat_vec); 
 
-    // Allocate classifier structures
-    hydra->classf_scores  = (int16_t*)  malloc(sizeof(int16_t)  * hydra->N_classes);
+    // Allocate scaler attribute memory
+    hydra->featMean = (int16_t*)  malloc(sizeof(int16_t) * hydra->len_feat_vec);
+    hydra->featStd  = (uint8_t *) malloc(sizeof(uint8_t) * hydra->len_feat_vec);
+
+    // Allocate classifier attribute structures
+    hydra->classf_scores  = (int32_t*)  malloc(sizeof(int32_t)  * hydra->N_classes);
     hydra->classf_bias    = (int16_t*)  malloc(sizeof(int16_t)  * hydra->N_classes);
     hydra->classf_weights = (int16_t**) malloc(sizeof(int16_t*) * hydra->N_classes);
 

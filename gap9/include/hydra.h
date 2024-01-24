@@ -2,9 +2,6 @@
 #include <stdint.h>
 #include <math.h>
 
-#define QN_SCALER =  3 
-#define QM_SCALER = 12
-
 typedef struct Hydra {
     // Memory allocations
     int16_t   **inX;
@@ -13,7 +10,7 @@ typedef struct Hydra {
     int16_t    *featVec;
     int16_t   **classf_weights;
     int16_t    *classf_bias;
-    int16_t    *classf_scores;
+    int32_t    *classf_scores;
 
     // Attributes
     uint16_t lenX;  
@@ -27,9 +24,14 @@ typedef struct Hydra {
     uint8_t  N_chan; 
     uint8_t  N_feats;
     uint16_t len_feat_vec;
+    uint8_t  conv_frac_bit_shift;
 
     // Classifier Attributes
     uint8_t N_classes;
+
+    // Scaler Attributes
+    int16_t *featMean;
+    uint8_t *featStd;
 
 } Hydra;
 
@@ -42,7 +44,8 @@ Hydra* hydra_init(
     uint8_t   N_diff,
     uint8_t   N_chan, 
     uint8_t   N_feats,
-    uint8_t   N_classes);
+    uint8_t   N_classes,
+    uint8_t   conv_frac_bit_shift);
 
 void hydra_reset(Hydra *hydra);
 
@@ -56,7 +59,7 @@ void hydra_convolve(int16_t   *inX,
 
 void hydra_forward(Hydra *hydra);
 
-void hydra_sparse_scale(int16_t featVec, float featMean, float featStd, uint16_t lenFeatVec); 
+void hydra_sparse_scale(Hydra *hydra); 
 
 void hydra_classifier(Hydra* hydra);
 

@@ -1,21 +1,25 @@
 #include "../include/hydra.h"
 
-void hydra_sparse_scale(int16_t featVec, float featMean, float featStd, uint16_t lenFeatVec) {
+void hydra_sparse_scale(Hydra *hydra) {
 
-    float16_t temp;
+    for(int f=0; f < hydra->len_feat_vec; f++) {
 
-    for(f=0; f < lenFeatVec; f++) {
+        // Under-clip to zero, skip normalization if feature is zero
+        hydra->featVec[f] = (hydra->featVec[f] < 0 ? 0 : hydra->featVec[f]);
+        
+        if(hydra->featVec[f] > 0) {
+            hydra->featVec[f] = hydra->featVec[f] - hydra->featMean[f];
 
-        // Under-clip to zero, cast to float
-        temp = (float)(featVec[f] < 0 ? 0 : featVec[f])
-
-        // Square root the value
-        temp = sqrt(temp);
-
-        // Normalize the value
-        temp = (temp - featMean[f]) / featStd[f]
-
-        // Conver the value back to int16_t, in Qn.m
-        featVec[f] = (int16_t)temp << QM_SCALER;
+            if(hydra->featVec[f] < 0) {
+                // Most values are positive, but arithmetic shift of negative numbers 
+                // is not equivalent to division by powers of two, since it does not round to zero.
+                for(int s = 0; s < hydra->featStd[f]; s++) {
+                    hydra->featVec[f] = (hydra->featVec[f]) / 2;
+                }
+            }
+            else {
+                hydra->featVec[f] = (hydra->featVec[f]) >> hydra->featStd[f];
+            }
+        }
     }
 }
