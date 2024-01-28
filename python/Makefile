@@ -26,8 +26,11 @@ clean_lib:
 test: 
 	$(PYTHONPATH) test.py 10000
 
+test_quant: 
+	$(PYTHONPATH) test_quant.py 10000
+
 run_ucr_benchmark: 
-	$(PYTHONPATH) run_ucr_benchmark.py all
+	$(PYTHONPATH) run_ucr_benchmark.py ECG5000
 
 analyze_ucr_benchmark: 
 	$(PYTHONPATH) scripts/ucr_compare.py

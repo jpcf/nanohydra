@@ -5,14 +5,14 @@ void hydra_convolve(int16_t *inX, int16_t ***inW, int16_t *featVec, uint8_t dil,
     uint8_t   h,k,wi;
     uint16_t  xi;
     int32_t   conv_out = 0;
-    int16_t   max, min;
+    int32_t   max, min;
     uint16_t  argmax=0, argmin=0;
 
     for(h=0; h < hydra->H; h++) {
         for(xi=0; xi < hydra->lenX - curr_diff; xi += 1) {
             // Reset the max and min
-            max = INT16_MIN;
-            min = INT16_MAX; 
+            max = INT16_MIN+1;
+            min = INT16_MAX-1; 
 
             // Iterate over kernels in given group
             for(k=0; k < hydra->K; k++) {
@@ -37,7 +37,7 @@ void hydra_convolve(int16_t *inX, int16_t ***inW, int16_t *featVec, uint8_t dil,
             }
 
             // Hard count and soft count 
-            featVec[h*hydra->K*hydra->N_feats + argmax*hydra->N_feats + 0] += max >> hydra->conv_frac_bit_shift;
+            featVec[h*hydra->K*hydra->N_feats + argmax*hydra->N_feats + 0] += (int16_t) (max >> hydra->conv_frac_bit_shift);
             featVec[h*hydra->K*hydra->N_feats + argmin*hydra->N_feats + 1] += 1;
         }
     }

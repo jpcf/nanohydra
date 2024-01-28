@@ -12,6 +12,9 @@ ctypedef cnp.int16_t DTYPE_X_t
 DTYPE_W = np.int16
 ctypedef cnp.int16_t DTYPE_W_t
 
+DTYPE_Y = np.int32
+ctypedef cnp.int32_t DTYPE_Y_t
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def conv1d_opt_x_int16_w_b1(cnp.ndarray[DTYPE_X_t, ndim=2] x, cnp.ndarray[DTYPE_W_t, ndim=3] w, unsigned int dilation):
@@ -25,7 +28,7 @@ def conv1d_opt_x_int16_w_b1(cnp.ndarray[DTYPE_X_t, ndim=2] x, cnp.ndarray[DTYPE_
 
     cdef unsigned int h,k,xi,wi,ex
 
-    cdef cnp.ndarray[DTYPE_X_t, ndim=4] Y     = np.zeros([num_examples, H, K, xlen], dtype=DTYPE_X)
+    cdef cnp.ndarray[DTYPE_Y_t, ndim=4] Y     = np.zeros([num_examples, H, K, xlen], dtype=DTYPE_Y)
     cdef cnp.ndarray[DTYPE_X_t, ndim=2] x_dil = np.zeros([num_examples, xlen+xpad_len*2], dtype=DTYPE_X)
 
     x_dil[:,xpad_len:xlen+xpad_len] = x[:,:]

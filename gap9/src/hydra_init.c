@@ -19,7 +19,7 @@ Hydra* hydra_init(
     hydra            = (Hydra*) malloc(sizeof(Hydra));
     hydra->lenX      = lenX;
     hydra->lenW      = lenW;
-    hydra->lenXpad   = padding_len(hydra->lenW,generate_dilation_val(hydra->N_dil))+50; // ToDO: For high dil, we need extra padding.
+    hydra->lenXpad   = padding_len(hydra->lenW,generate_dilation_val(hydra->N_dil))+100; // ToDO: For high dil, we need extra padding.
     hydra->K         = K;
     hydra->G         = G;
     hydra->N_dil     = N_dil;

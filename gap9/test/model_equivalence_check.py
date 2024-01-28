@@ -35,6 +35,7 @@ def check_rck_output(Y, Yc):
         if(nerr):
             print(f"ERROR: Number of errors={nerr}")
             print(f"Positions: {np.arange(len(Y_ex))[err]}")
+            print(f"Values: {Y_ex[err]} vs {Yc_ex[err]}")
         else:
             print(f"PASS: No Errors!")
 
@@ -62,7 +63,7 @@ print(f"Input Vector Quant.: {lq_input}")
 accum_bits_shift = lq_input.get_fract_bits()-1
 
 # Initialize the kernel transformer, scaler and classifier
-model  = NanoHydra(input_length=input_length, num_channels=NUM_CHAN, k=K, g=G, max_dilations=MAX_DILATIONS, dist="binomial", classifier="Logistic", scaler="Sparse", seed=3213, dtype=np.int16, verbose=False)    
+model  = NanoHydra(input_length=input_length, num_channels=NUM_CHAN, k=K, g=G, max_dilations=MAX_DILATIONS, dist="binomial", classifier="Logistic", scaler="Sparse", seed=int(time.time()), dtype=np.int16, verbose=False)    
 
 # Transform and scale
 print(f"Transforming {Xtrain.shape[0]} training examples...")
@@ -79,7 +80,6 @@ Y = model.activ
 
 # Dump model params
 print(f"Feature Vector Length: {len(Xt[0])}")
-
 Wq, bq =model.dump_classifier_weights()
 W = model.dump_weights()
 
@@ -111,9 +111,7 @@ Yc = []
 with open("dist/output.txt", "r") as f:
     for line in f.readlines():
         Yc.append(np.array(line.split(",")[:-1]).astype(np.int16))
-
 print(Y[356])
 print(Yc[0])
-
-check_rck_output(Y[356], Yc)
+check_rck_output([Y[356]], Yc)
 

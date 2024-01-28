@@ -233,11 +233,9 @@ class NanoHydra():
                 feats = [None for i in range(self.num_channels)]
                 
                 for channel in range(self.num_channels):
-                    #print(f"Dil={dilation_index}, Diff={diff_index}, Chan={channel}")
                     _X = X[:,channel,:] if diff_index == 0 else diff_X[:,channel,:]
 
                     # Perform convolution on all kernels of a given dilation
-                    #print(f"Current Dilation: {d}")
                     if(self.dtype == np.int16):
                         _Z = conv1d_opt_x_int16_w_b1(_X, self.W, dilation = d)
                     else:

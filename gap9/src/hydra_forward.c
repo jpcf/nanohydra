@@ -11,7 +11,6 @@ void hydra_forward(Hydra *hydra) {
     // Iterate through the work chunks, for each dil/diff combination
     for (dil_idx = 0; dil_idx < hydra->N_dil; dil_idx++) {
         dil = generate_dilation_val(dil_idx);
-        printf("Dilation(%d): %d\n", dil_idx, dil);
         for (diff_idx = 0; diff_idx < hydra->N_diff; diff_idx++) {
             for (chan = 0; chan < hydra->N_chan; chan++) {
                 // Parallelization point for OMP Tasks. Since Chan and Dil are highly variable from
