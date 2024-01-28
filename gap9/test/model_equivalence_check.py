@@ -17,7 +17,13 @@ G=16
 MAX_DILATIONS = 5
 DO_QUANTIZE=True
 
+DIST_FOLDER = "./dist/"
+SPLITS = ["train", "test"]
+
 def check_rck_output(Y, Yc):
+
+    nerr_ex = 0
+
     for s in range(len(Yc)):
         Y_ex  = Y[s]
         Yc_ex = Yc[s]
@@ -26,7 +32,8 @@ def check_rck_output(Y, Yc):
         if(len(Y_ex) != len(Yc_ex)):
             print(f"ERROR: Feature Vector Length -- Python Model: {len(Y_ex)} vs C Model: {len(Yc_ex)}")
         else:
-            print(f"PASS: Feature Vector Length -- Python Model: {len(Y_ex)} vs C Model: {len(Yc_ex)}")
+            pass
+            #print(f"PASS: Feature Vector Length -- Python Model: {len(Y_ex)} vs C Model: {len(Yc_ex)}")
 
         # Check for errors
         err  = Y_ex != Yc_ex
@@ -36,8 +43,12 @@ def check_rck_output(Y, Yc):
             print(f"ERROR: Number of errors={nerr}")
             print(f"Positions: {np.arange(len(Y_ex))[err]}")
             print(f"Values: {Y_ex[err]} vs {Yc_ex[err]}")
+            nerr_ex += 1
         else:
-            print(f"PASS: No Errors!")
+            pass
+            #print(f"PASS: No Errors!")
+
+    return nerr_ex    
 
 # Fetch the dataset
 X  = {'test': {}, 'train': {}}
@@ -62,29 +73,36 @@ Xtest  = lq_input.quantize(Xtest)
 print(f"Input Vector Quant.: {lq_input}")
 accum_bits_shift = lq_input.get_fract_bits()-1
 
+# Dump input vectors
+fp = np.memmap(f"dist/input_train.dat", dtype='int16', mode="w+", shape=(Xtrain.shape[0], Xtrain.shape[2]))
+fp[:] = Xtrain[:,0,:]
+fp.flush()
+print(fp)
+del fp
+fp = np.memmap(f"dist/input_test.dat", dtype='int16', mode="w+", shape=(Xtest.shape[0], Xtest.shape[2]))
+fp[:] = Xtest[:,0,:]
+fp.flush()
+print(fp)
+del fp
+
 # Initialize the kernel transformer, scaler and classifier
 model  = NanoHydra(input_length=input_length, num_channels=NUM_CHAN, k=K, g=G, max_dilations=MAX_DILATIONS, dist="binomial", classifier="Logistic", scaler="Sparse", seed=int(time.time()), dtype=np.int16, verbose=False)    
 
 # Transform and scale
 print(f"Transforming {Xtrain.shape[0]} training examples...")
-Xt  = model.forward_batch(Xtrain, 500, do_fit=True, do_scale=True, quantize_scaler=True, frac_bit_shift=accum_bits_shift)
+Xt = {}
+Xt['train']  = model.forward_batch(Xtrain, 500, do_fit=True,  do_scale=True, quantize_scaler=True, frac_bit_shift=accum_bits_shift)
+Xt['test']   = model.forward_batch(Xtest,  500, do_fit=False, do_scale=True, quantize_scaler=True, frac_bit_shift=accum_bits_shift)
 
 # Fit
 print(f"Fitting {Xtrain.shape[0]} training examples...")
-model.fit_classifier(Xt, Ytrain)
+model.fit_classifier(Xt['train'], Ytrain)
 model.quantize_classifier(8)
 
-# Classify (model)
-model.predict_quantized(Xt)
-Y = model.activ
-
 # Dump model params
-print(f"Feature Vector Length: {len(Xt[0])}")
 Wq, bq =model.dump_classifier_weights()
 W = model.dump_weights()
 
-with open("dist/input.txt", "w") as f:
-    f.write(",".join([str(x) for x in Xtrain[356][0].astype(np.int16)])+"\n")
 
 with open("dist/weights.txt", "w") as f:
     for wline in W:
@@ -104,14 +122,20 @@ with open("dist/bias_classf.txt", "w") as f:
     f.write(",".join([str(bv) for bv in bq])+",\n")
 
 # Run C model, which will dump the output feature vector 
-os.system("./dist/model_equivalence_check")
+for split in SPLITS:
+    model.predict_quantized(Xt[split])
+    
+    t_start = time.perf_counter()
+    os.system(f"./dist/model_equivalence_check ./dist/input_{split}.dat {len(Xt[split])}")
+    t_end= time.perf_counter()
 
-# Read the output feature vector produced by the C model
-Yc = []
-with open("dist/output.txt", "r") as f:
-    for line in f.readlines():
-        Yc.append(np.array(line.split(",")[:-1]).astype(np.int16))
-print(Y[356])
-print(Yc[0])
-check_rck_output([Y[356]], Yc)
+    # Read the output feature vector produced by the C model
+    Yc = []
+    with open("dist/output.txt", "r") as f:
+        for line in f.readlines():
+            Yc.append(np.array(line.split(",")[:-1]).astype(np.int16))
+
+    nerr = check_rck_output(model.activ, Yc)
+
+    print(f"Tested {len(model.activ)} vectors. Found {nerr} wrong outputs. Duration: {t_end-t_start: .6f}")
 

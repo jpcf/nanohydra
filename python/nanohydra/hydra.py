@@ -321,14 +321,14 @@ class NanoHydra():
         W = self.cfg.get_classf().coef_
         b = self.cfg.get_classf().intercept_
         self.lq = LayerQuantizer(np.concatenate((W.flatten(), b.flatten())), nbits_repr)
-        print(self.lq)
+        #print(self.lq)
         self.Wq  = self.lq.quantize(W)
         self.bq  = self.lq.quantize(b)
         self.Wdq = self.lq.dequantize(self.Wq)
         self.bdq = self.lq.dequantize(self.bq)
-        print(f"The Original W: {W}")
-        print(f"Quantized    W: {self.Wq}")
-        print(f"De-Quantized W: {self.Wdq}")
+        #print(f"The Original W: {W}")
+        #print(f"Quantized    W: {self.Wq}")
+        #print(f"De-Quantized W: {self.Wdq}")
 
     def dump_classifier_weights(self):
         return self.Wq, self.bq
@@ -428,9 +428,9 @@ class SparseScaler():
 
         X = np.clip(X, a_min=0, a_max=None).astype(np.int16)
 
-        print(f"X: {X}" )
-        print(f"u: {self.muq}" )
-        print(f"s: {self.sigmaq}")
+        #print(f"X: {X}" )
+        #print(f"u: {self.muq}" )
+        #print(f"s: {self.sigmaq}")
 
         if self.mask:
             

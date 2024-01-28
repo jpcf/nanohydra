@@ -1,5 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include "../include/hydra.h"
 
 
@@ -14,28 +17,32 @@
 #define NUM_CLASSES   5
 #define CONV_FRAC_BITS 10
 
-int main(void) {
+int main(int argc, char *argv[]) {
     Hydra *hydra;
+    int16_t *inXptr;
 
+    // Initialize Hydra model
     hydra = hydra_init(INPUT_LEN, WEIGH_LEN, NUM_K, NUM_G,
                        MAX_DILATIONS, NUM_DIFFS, NUM_CHAN,
                        NUM_FEATS, NUM_CLASSES, CONV_FRAC_BITS);
-    hydra_reset(hydra); 
 
-    printf("Feat Vect Len: %d\n", hydra->len_feat_vec);
 
     // Read input vector
-    FILE* fd = fopen("./dist/input.txt", "r");
-    int ret = 0;
+    int fdi = open(argv[1], O_RDONLY);
+    int num_samples = atoi(argv[2]);
+    printf("Feat Vect Len: %d. Processing %d samples\n", hydra->len_feat_vec, num_samples);
 
-    for(int i=0; i < hydra->lenX; i++) {
-        ret = fscanf(fd, "%hd,", &(hydra->inX[0][i+hydra->lenXpad]));
-        if(ret < 1) break;
-    } 
-    fclose(fd);
+    if(fdi == -1)
+        printf("Error opening input file");
+    inXptr = (int16_t*) mmap(NULL, num_samples*(INPUT_LEN+hydra->lenXpad*2+1)*2, PROT_READ, MAP_SHARED, fdi, 0)
+    ;
+
+    if(inXptr == MAP_FAILED)
+        printf("MMAP Failed!\n");
 
     // Read weights
-    fd = fopen("./dist/weights.txt", "r");
+    FILE* fd = fopen("./dist/weights.txt", "r");
+    int ret;
     for(int h=0; h < hydra->H; h++) { 
         for(int k=0; k < hydra->K; k++) {
             ret = fscanf(fd, "%hd,%hd,%hd,%hd,%hd,%hd,%hd,%hd,%hd\n", 
@@ -51,7 +58,6 @@ int main(void) {
             if(ret < 9) break;
         }
     }
-    fclose(fd);
 
     // Read scaler means 
     fd = fopen("./dist/means.txt", "r");
@@ -90,22 +96,40 @@ int main(void) {
     }
     fclose(fd);
 
-    // Generate Difference Vector
-    for (int chan = 0; chan < hydra->N_chan; chan++) {
-        for (int xi=0; xi < hydra->lenX-1; xi++) {
-            hydra->inX_diff[chan][xi+hydra->lenXpad] = hydra->inX[chan][xi+1+hydra->lenXpad]-hydra->inX[chan][xi+hydra->lenXpad];
-        }
-    }
-
-    // Process the current input vector.
-    hydra_forward(hydra);
-    hydra_sparse_scale(hydra);
-    hydra_classifier(hydra);
-
     // Dump features for validation
     fd = fopen("./dist/output.txt", "w");
-    for(int i=0; i < hydra->N_classes; i++) {
-        fprintf(fd, "%d,", hydra->classf_scores[i]);
+
+    // Process the current input vector.
+    for(int i=0; i < num_samples; i++) {
+
+        hydra_reset(hydra); 
+
+        // Generate Difference Vector
+        for (int chan = 0; chan < hydra->N_chan; chan++) {
+            for (int xi=0; xi < hydra->lenX; xi++) {
+                hydra->inX[0][hydra->lenXpad+xi] = inXptr[i*INPUT_LEN+xi];
+            }
+            for (int xi=0; xi < hydra->lenX-1; xi++) {
+                hydra->inX_diff[chan][xi+hydra->lenXpad] = hydra->inX[chan][xi+1+hydra->lenXpad]-hydra->inX[chan][xi+hydra->lenXpad];
+            }
+        }
+
+        /*
+        // Useful for debugging, if needed
+        printf("Just Checking [%d] = %d %d %d ... %d %d %d\n", i, 
+                hydra->inX[0][hydra->lenXpad+0], hydra->inX[0][hydra->lenXpad+1], hydra->inX[0][hydra->lenXpad+2],
+                hydra->inX[0][hydra->lenXpad+137], hydra->inX[0][hydra->lenXpad+138], hydra->inX[0][hydra->lenXpad+139]
+                );
+        */
+        hydra_forward(hydra);
+        hydra_sparse_scale(hydra);
+        hydra_classifier(hydra);
+
+        for(int i=0; i < hydra->N_classes; i++) {
+            fprintf(fd, "%d,", hydra->classf_scores[i]);
+        }
+        fprintf(fd, "\n");
     }
+
     fclose(fd);
 }

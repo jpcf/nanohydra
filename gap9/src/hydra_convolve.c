@@ -11,8 +11,8 @@ void hydra_convolve(int16_t *inX, int16_t ***inW, int16_t *featVec, uint8_t dil,
     for(h=0; h < hydra->H; h++) {
         for(xi=0; xi < hydra->lenX - curr_diff; xi += 1) {
             // Reset the max and min
-            max = INT16_MIN+1;
-            min = INT16_MAX-1; 
+            max = INT32_MIN+1;
+            min = INT32_MAX-1; 
 
             // Iterate over kernels in given group
             for(k=0; k < hydra->K; k++) {
