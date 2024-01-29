@@ -117,9 +117,8 @@ int main(int argc, char *argv[]) {
         hydra_reset(hydra); 
         // Generate Difference Vector
         for (int chan = 0; chan < hydra->N_chan; chan++) {
-            for (int xi=0; xi < hydra->lenX; xi++) {
-                hydra->inX[0][hydra->lenXpad+xi] = inXptr[i*INPUT_LEN+xi];
-            }
+            memcpy(&hydra->inX[0][hydra->lenXpad], &inXptr[i*INPUT_LEN], INPUT_LEN*2);
+
             for (int xi=0; xi < hydra->lenX-1; xi++) {
                 hydra->inX_diff[chan][xi+hydra->lenXpad] = hydra->inX[chan][xi+1+hydra->lenXpad]-hydra->inX[chan][xi+hydra->lenXpad];
             }
@@ -136,6 +135,7 @@ int main(int argc, char *argv[]) {
         hydra_sparse_scale(hydra);
         hydra_classifier(hydra);
 
+        // This is actually faster than memcpy
         outptr[i*NUM_CLASSES + 0] = hydra->classf_scores[0];
         outptr[i*NUM_CLASSES + 1] = hydra->classf_scores[1];
         outptr[i*NUM_CLASSES + 2] = hydra->classf_scores[2];
