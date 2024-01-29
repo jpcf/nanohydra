@@ -130,10 +130,7 @@ for split in SPLITS:
     t_end= time.perf_counter()
 
     # Read the output feature vector produced by the C model
-    Yc = []
-    with open("dist/output.txt", "r") as f:
-        for line in f.readlines():
-            Yc.append(np.array(line.split(",")[:-1]).astype(np.int16))
+    Yc = np.memmap(f"./dist/output.dat", dtype='int32', mode="r", shape=(len(Xt[split]), 5))
 
     nerr = check_rck_output(model.activ, Yc)
 

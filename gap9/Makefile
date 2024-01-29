@@ -82,7 +82,7 @@ scaler_equivalence_check: $(BUILDPATH)/hydra_sparse_scale.o $(BUILDPATH)/hydra_i
 	$(CC) $(CFLAGS) -fopenmp $(TESTPATH)/scaler_equivalence_check.c -o $(DISTPATH)/scaler_equivalence_check $(BUILDPATH)/hydra_init.o $(BUILDPATH)/hydra_sparse_scale.o $(BUILDPATH)/hydra_utils.o  $(BUILDPATH)/hydra_reset.o -lm
 
 model_equivalence_check: $(BUILDPATH)/hydra_convolve.o  $(BUILDPATH)/hydra_forward.o $(BUILDPATH)/hydra_reset.o $(BUILDPATH)/hydra_utils.o $(BUILDPATH)/hydra_init.o $(BUILDPATH)/hydra_sparse_scale.o $(BUILDPATH)/hydra_classifier.o
-	$(CC) $(CFLAGS) -fopenmp $(TESTPATH)/model_equivalence_check.c -o $(DISTPATH)/model_equivalence_check $(BUILDPATH)/hydra_*.o -lm
+	$(CC) $(CFLAGS) -fopenmp $(TESTPATH)/model_equivalence_check.c -o $(DISTPATH)/model_equivalence_check $(BUILDPATH)/hydra_*.o -lm -lc
 clean:
 	rm -rf $(BUILDPATH)
 	rm -rf $(DISTPATH)

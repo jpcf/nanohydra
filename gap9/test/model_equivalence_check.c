@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#define _GNU_SOURCE
 #include <fcntl.h>
+#include <errno.h>
 #include "../include/hydra.h"
 
 
@@ -34,8 +36,7 @@ int main(int argc, char *argv[]) {
 
     if(fdi == -1)
         printf("Error opening input file");
-    inXptr = (int16_t*) mmap(NULL, num_samples*(INPUT_LEN+hydra->lenXpad*2+1)*2, PROT_READ, MAP_SHARED, fdi, 0)
-    ;
+    inXptr = (int16_t*) mmap(NULL, num_samples*(INPUT_LEN+hydra->lenXpad*2+1)*2, PROT_READ, MAP_SHARED, fdi, 0);
 
     if(inXptr == MAP_FAILED)
         printf("MMAP Failed!\n");
@@ -97,13 +98,23 @@ int main(int argc, char *argv[]) {
     fclose(fd);
 
     // Dump features for validation
-    fd = fopen("./dist/output.txt", "w");
+    int fdo = open("./dist/output.dat", O_RDWR | O_CREAT, (mode_t)0600);
+    if(fdo == -1)
+        printf("Error opening output file: %d", errno);
+    ftruncate(fdo, num_samples*(NUM_CLASSES)*4);
+
+    if(ret < 0) {
+        printf("Error allocating file!\n");
+    }
+
+    int32_t* outptr = (int32_t*) mmap(NULL, num_samples*(NUM_CLASSES)*4, PROT_READ | PROT_WRITE, MAP_SHARED, fdo, 0); 
+
+    if(outptr == MAP_FAILED)
+        printf("MMAP Failed: %d\n", errno);
 
     // Process the current input vector.
     for(int i=0; i < num_samples; i++) {
-
         hydra_reset(hydra); 
-
         // Generate Difference Vector
         for (int chan = 0; chan < hydra->N_chan; chan++) {
             for (int xi=0; xi < hydra->lenX; xi++) {
@@ -125,11 +136,15 @@ int main(int argc, char *argv[]) {
         hydra_sparse_scale(hydra);
         hydra_classifier(hydra);
 
-        for(int i=0; i < hydra->N_classes; i++) {
-            fprintf(fd, "%d,", hydra->classf_scores[i]);
-        }
-        fprintf(fd, "\n");
+        outptr[i*NUM_CLASSES + 0] = hydra->classf_scores[0];
+        outptr[i*NUM_CLASSES + 1] = hydra->classf_scores[1];
+        outptr[i*NUM_CLASSES + 2] = hydra->classf_scores[2];
+        outptr[i*NUM_CLASSES + 3] = hydra->classf_scores[3];
+        outptr[i*NUM_CLASSES + 4] = hydra->classf_scores[4];
     }
 
-    fclose(fd);
+    msync(outptr, num_samples*(NUM_CLASSES)*4, MS_SYNC);
+    close(fdo);
+    close(fdi);
+
 }
