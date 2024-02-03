@@ -52,7 +52,7 @@ void hydra_reset(Hydra *hydra);
 void hydra_convolve(int16_t   *inX, 
                     int16_t ***inW, 
                     int16_t   *featVec, 
-                    uint8_t    dil,
+                    uint16_t   dil,
                     Hydra     *hydra,
                     uint8_t    diff_idx
                     );

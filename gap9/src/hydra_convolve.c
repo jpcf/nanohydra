@@ -1,14 +1,19 @@
 #include "../include/hydra.h"
 
-void hydra_convolve(int16_t *inX, int16_t ***inW, int16_t *featVec, uint8_t dil, Hydra* hydra, uint8_t curr_diff) {
+void hydra_convolve(int16_t *inX, int16_t ***inW, int16_t *featVec, uint16_t dil, Hydra* hydra, uint8_t curr_diff) {
 
-    uint8_t   h,k,wi;
+    uint16_t   h,k,wi;
     uint16_t  xi;
     int32_t   conv_out = 0;
     int32_t   max, min;
     uint16_t  argmax=0, argmin=0;
+    int16_t   *featVecPtr;
+    int16_t   **inWptr;
 
     for(h=0; h < hydra->H; h++) {
+        featVecPtr = &(featVec[h*hydra->K*hydra->N_feats]);
+        inWptr     = inW[h];
+
         for(xi=0; xi < hydra->lenX - curr_diff; xi += 1) {
             // Reset the max and min
             max = INT32_MIN+1;
@@ -20,7 +25,7 @@ void hydra_convolve(int16_t *inX, int16_t ***inW, int16_t *featVec, uint8_t dil,
                 conv_out = 0;
                 
                 for(wi=0; wi < hydra->lenW; wi++) {
-                    conv_out += (int32_t)(inX[xi+hydra->lenXpad+(wi-4)*(dil+1)] * inW[h][k][wi]);
+                    conv_out += (int32_t)(inX[xi+hydra->lenXpad+(wi-4)*(dil+1)] * inWptr[k][wi]);
                 }
 
                 // Determine if convolutional output is the new winning/losing kernel
@@ -37,8 +42,8 @@ void hydra_convolve(int16_t *inX, int16_t ***inW, int16_t *featVec, uint8_t dil,
             }
 
             // Hard count and soft count 
-            featVec[h*hydra->K*hydra->N_feats + argmax*hydra->N_feats + 0] += (int16_t) (max >> hydra->conv_frac_bit_shift);
-            featVec[h*hydra->K*hydra->N_feats + argmin*hydra->N_feats + 1] += 1;
+            featVecPtr[argmax*hydra->N_feats + 0] += (int16_t) (max >> hydra->conv_frac_bit_shift);
+            featVecPtr[argmin*hydra->N_feats + 1] += 1;
         }
     }
 }
