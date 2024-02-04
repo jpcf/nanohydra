@@ -1,6 +1,6 @@
 #include "../include/hydra.h"
 
-void hydra_convolve(int16_t *inX, int16_t ***inW, int16_t *featVec, uint16_t dil, Hydra* hydra, uint8_t curr_diff) {
+void hydra_convolve(int16_t *inX, int8_t ***inW, int16_t *featVec, uint16_t dil, Hydra* hydra, uint8_t curr_diff) {
 
     uint16_t   h,k,wi;
     uint16_t  xi;
@@ -8,7 +8,7 @@ void hydra_convolve(int16_t *inX, int16_t ***inW, int16_t *featVec, uint16_t dil
     int32_t   max, min;
     uint16_t  argmax=0, argmin=0;
     int16_t   *featVecPtr;
-    int16_t   **inWptr;
+    int8_t   **inWptr;
 
     for(h=0; h < hydra->H; h++) {
         featVecPtr = &(featVec[h*hydra->K*hydra->N_feats]);

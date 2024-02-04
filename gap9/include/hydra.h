@@ -6,7 +6,7 @@ typedef struct Hydra {
     // Memory allocations
     int16_t   **inX;
     int16_t   **inX_diff;
-    int16_t  ***inW;
+    int8_t  ***inW;
     int16_t    *featVec;
     int16_t   **classf_weights;
     int16_t    *classf_bias;
@@ -50,7 +50,7 @@ Hydra* hydra_init(
 void hydra_reset(Hydra *hydra);
 
 void hydra_convolve(int16_t   *inX, 
-                    int16_t ***inW, 
+                    int8_t  ***inW, 
                     int16_t   *featVec, 
                     uint16_t   dil,
                     Hydra     *hydra,

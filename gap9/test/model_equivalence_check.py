@@ -103,23 +103,32 @@ model.quantize_classifier(8)
 Wq, bq =model.dump_classifier_weights()
 W = model.dump_weights()
 
+fp = np.memmap(f"dist/weights.dat", dtype='int8', mode="w+", shape=(W.shape[0], W.shape[1]))
+fp[:] = W[:,:]
+fp.flush()
+del fp
 
-with open("dist/weights.txt", "w") as f:
-    for wline in W:
-        f.write(",".join([str(w) for w in wline])+"\n")
+means = model.cfg.get_scaler().muq
+fp = np.memmap(f"dist/means.dat", dtype='int16', mode="w+", shape=(len(means)))
+fp[:] = means[:]
+fp.flush()
+del fp
 
-with open("dist/means.txt", "w") as f:
-    f.write(",".join([str(x) for x in model.cfg.get_scaler().muq])+"\n")
+sigmas = model.cfg.get_scaler().sigmaq
+fp = np.memmap(f"dist/stds.dat", dtype='uint8', mode="w+", shape=(len(sigmas)))
+fp[:] = sigmas[:]
+fp.flush()
+del fp
 
-with open("dist/stds.txt", "w") as f:
-    f.write(",".join([str(x) for x in model.cfg.get_scaler().sigmaq])+"\n")
+fp = np.memmap(f"dist/weights_classf.dat", dtype='int16', mode="w+", shape=(Wq.shape[0], Wq.shape[1]))
+fp[:] = Wq[:,:]
+fp.flush()
+del fp
 
-with open("dist/weights_classf.txt", "w") as f:
-    for wline in Wq:
-        f.write(",".join([str(w) for w in wline])+",\n")
-
-with open("dist/bias_classf.txt", "w") as f:
-    f.write(",".join([str(bv) for bv in bq])+",\n")
+fp = np.memmap(f"dist/weights_bias.dat", dtype='int16', mode="w+", shape=(bq.shape[0]))
+fp[:] = bq[:]
+fp.flush()
+del fp
 
 # Run C model, which will dump the output feature vector 
 for split in SPLITS:

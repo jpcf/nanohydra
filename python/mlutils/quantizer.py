@@ -1,5 +1,4 @@
 import numpy as np
-from fixedpoint import FixedPoint
 
 class LayerQuantizer():
 

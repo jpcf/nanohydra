@@ -22,6 +22,10 @@
 int main(int argc, char *argv[]) {
     Hydra *hydra;
     int16_t *inXptr;
+    int8_t  *inPtr_8;
+    int16_t *inPtr_16;
+    int ret;
+    FILE* fd;
 
     // Initialize Hydra model
     hydra = hydra_init(INPUT_LEN, WEIGH_LEN, NUM_K, NUM_G,
@@ -42,60 +46,36 @@ int main(int argc, char *argv[]) {
         printf("MMAP Failed!\n");
 
     // Read weights
-    FILE* fd = fopen("./dist/weights.txt", "r");
-    int ret;
+    fdi = open("./dist/weights.dat", O_RDONLY);
+    inPtr_8 = (int8_t*) mmap(NULL, hydra->H*hydra->K*WEIGH_LEN, PROT_READ, MAP_SHARED, fdi, 0);
     for(int h=0; h < hydra->H; h++) { 
         for(int k=0; k < hydra->K; k++) {
-            ret = fscanf(fd, "%hd,%hd,%hd,%hd,%hd,%hd,%hd,%hd,%hd\n", 
-                &(hydra->inW[h][k][0]), 
-                &(hydra->inW[h][k][1]), 
-                &(hydra->inW[h][k][2]), 
-                &(hydra->inW[h][k][3]), 
-                &(hydra->inW[h][k][4]), 
-                &(hydra->inW[h][k][5]), 
-                &(hydra->inW[h][k][6]), 
-                &(hydra->inW[h][k][7]),
-                &(hydra->inW[h][k][8]));
-            if(ret < 9) break;
+            memcpy(hydra->inW[h][k], &inPtr_8[h*hydra->K*WEIGH_LEN+k*WEIGH_LEN], WEIGH_LEN);
         }
     }
 
     // Read scaler means 
-    fd = fopen("./dist/means.txt", "r");
-
-    for(int i=0; i < hydra->len_feat_vec; i++) {
-        ret = fscanf(fd, "%hd,", &(hydra->featMean[i]));
-        if(ret < 1) break;
-    } 
-    fclose(fd);
+    fdi = open("./dist/means.dat", O_RDONLY);
+    inPtr_16 = (int16_t*) mmap(NULL, hydra->len_feat_vec, PROT_READ, MAP_SHARED, fdi, 0);
+    memcpy(hydra->featMean, inPtr_16, 2*hydra->len_feat_vec);
 
     // Read scaler standard deviations
-    fd = fopen("./dist/stds.txt", "r");
-    for(int i=0; i < hydra->len_feat_vec; i++) {
-        ret = fscanf(fd, "%hhd,", &(hydra->featStd[i]));
-        if(ret < 1) break;
-    } 
-    fclose(fd);
+    fdi = open("./dist/stds.dat", O_RDONLY);
+    inPtr_8 = (uint8_t*) mmap(NULL, hydra->len_feat_vec, PROT_READ, MAP_SHARED, fdi, 0);
+    memcpy(hydra->featStd, inPtr_8, hydra->len_feat_vec);
 
     // Read classifier weights
-    fd = fopen("./dist/weights_classf.txt", "r");
-
+    fdi = open("./dist/weights_classf.dat", O_RDONLY);
+    inPtr_16 = (int16_t*) mmap(NULL, 2*NUM_CLASSES*hydra->len_feat_vec, PROT_READ, MAP_SHARED, fdi, 0);
     for(int c=0; c < hydra->N_classes; c++) { 
-        for(int f=0; f < hydra->len_feat_vec; f++) {
-            ret = fscanf(fd, "%hd,", &(hydra->classf_weights[c][f]));
-            if(ret < 1) break;
-        }
+        memcpy(hydra->classf_weights[c], &inPtr_16[c*hydra->len_feat_vec], 2*hydra->len_feat_vec);
     }
-    fclose(fd);
 
     // Read classifier bias
-    fd = fopen("./dist/bias_classf.txt", "r");
+    fdi = open("./dist/weights_bias.dat", O_RDONLY);
+    inPtr_16 = (int16_t*) mmap(NULL, 2*hydra->N_classes, PROT_READ, MAP_SHARED, fdi, 0);
+    memcpy(hydra->classf_bias, inPtr_16, 2*hydra->N_classes);
 
-    for(int c=0; c < hydra->N_classes; c++) { 
-        ret = fscanf(fd, "%hd,", &(hydra->classf_bias[c]));
-        if(ret < 1) break;
-    }
-    fclose(fd);
 
     // Dump features for validation
     int fdo = open("./dist/output.dat", O_RDWR | O_CREAT, (mode_t)0600);
