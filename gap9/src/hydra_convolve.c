@@ -7,17 +7,23 @@ void hydra_convolve(int16_t *inX, int8_t **inW, int16_t *featVec, uint16_t dil, 
     int32_t   conv_out = 0;
     int32_t   max, min;
     uint16_t  argmax=0, argmin=0;
+    int16_t   featVecTmpMax[8];
+    int16_t   featVecTmpMin[8];
     int16_t   *featVecPtr;
     int8_t    *inWptr[hydra->K];
     int16_t   *inXptr;
 
     for(h=0; h < hydra->H; h++) {
+        // Prefetch array at the right location, to avoid access pointer arithmetic for lenX*H times.
         featVecPtr = &(featVec[h*hydra->K*hydra->N_feats]);
         inXptr     = &inX[hydra->lenXpad-4*dil-4];
 
         for(k=0; k < hydra->K; k++) {
             inWptr[k] = &(inW[h][k*hydra->lenW]);
+            featVecTmpMax[k] = 0;
+            featVecTmpMin[k] = 0;
         }
+
         for(xi=0; xi < hydra->lenX - curr_diff; xi += 1) {
             // Reset the max and min
             max = INT32_MIN+1;
@@ -59,9 +65,16 @@ void hydra_convolve(int16_t *inX, int8_t **inW, int16_t *featVec, uint16_t dil, 
                 }
             }
 
-            // Hard count and soft count 
-            featVecPtr[argmax*hydra->N_feats + 0] += (int16_t) (max >> hydra->conv_frac_bit_shift);
-            featVecPtr[argmin*hydra->N_feats + 1] += 1;
+            // Hard count and soft count. The accumulation is temporarily done here, as this avoids repeating
+            // the access pointer arithmetic for lenX*H times. 
+            featVecTmpMax[argmax] += (int16_t) (max >> hydra->conv_frac_bit_shift);
+            featVecTmpMin[argmin] += 1;
+        }
+
+        // The accumulation statistics for group h are saved in the main array.
+        for(k=0; k < hydra->K; k++) {
+            featVecPtr[k*hydra->N_feats + 0] += featVecTmpMax[k];
+            featVecPtr[k*hydra->N_feats + 1] += featVecTmpMin[k];
         }
     }
 }
