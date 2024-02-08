@@ -18,7 +18,7 @@ MAX_DILATIONS = 5
 DO_QUANTIZE=True
 
 DIST_FOLDER = "./dist/"
-SPLITS = ["train"] #, "test"]
+SPLITS = ["train"]
 RUN_ON_TARGET_GAP9 = True
 
 def check_rck_output(Y, Yc):
@@ -147,5 +147,14 @@ for split in SPLITS:
 
     nerr = check_rck_output(model.activ, Yc)
 
-    print(f"Tested {len(model.activ)} vectors. Found {nerr} wrong outputs. Duration: {t_end-t_start: .6f}")
+    print(f"Tested {len(model.activ)} vectors. Found {nerr} wrong outputs vs Model. Duration: {t_end-t_start: .6f}")
+    
+    # Y has one-based indexing, so we subtract 1
+    if(split == "test"):
+        Yground_truth = Ytest.astype(np.uint8)-1
+    else:
+        Yground_truth = Ytrain.astype(np.uint8)-1
+
+    acc = model.score_manual(Yc, Yground_truth, method='prob')
+    print(f"Prediction accuracy for '{split}': {acc*100:.2f} %")
 
