@@ -27,7 +27,7 @@
 #define NUM_FEATS     2
 #define NUM_CLASSES   5
 #define CONV_FRAC_BITS 10
-#define NUM_SAMPLES 50
+#define NUM_SAMPLES 500
 
 #if defined(CONFIG_HELLOWORLD_CLUSTER)
 void pe_entry(void *arg)
@@ -186,7 +186,7 @@ int main()
     }
     printf("Hostfs mounted\n");
     
-    char *filename = "output_file.dat";
+    char *filename = "output.dat";
     fd[1] = pi_fs_open(&host_fs, filename, PI_FS_FLAGS_WRITE);
     if (fd[1] == NULL)
     {
@@ -224,7 +224,8 @@ int main()
         /************* SECTION 4c: Collect benchmarks *************/
         cycles = pi_perf_read(PI_PERF_CYCLES);
         cycles_million  += (float)(cycles-cycles_prev) / 1000000;
-        printf("Processed %6d samples. # Cycles: %ld\n", s, cycles-cycles_prev);
+        if(s % 20 == 0)
+            printf("Processed %6d samples. # Cycles: %ld\n", s, cycles-cycles_prev);
         cycles_prev = cycles;
         /**********************************************************/
 

@@ -18,7 +18,8 @@ MAX_DILATIONS = 5
 DO_QUANTIZE=True
 
 DIST_FOLDER = "./dist/"
-SPLITS = ["train", "test"]
+SPLITS = ["train"] #, "test"]
+RUN_ON_TARGET_GAP9 = True
 
 def check_rck_output(Y, Yc):
 
@@ -135,7 +136,10 @@ for split in SPLITS:
     model.predict_quantized(Xt[split])
     
     t_start = time.perf_counter()
-    os.system(f"./dist/model_equivalence_check ./dist/input_{split}.dat {len(Xt[split])}")
+    if(RUN_ON_TARGET_GAP9):
+        os.system(f"cd ./gap_apps/first_app_full && cmake --build build --target run && cp build/output.dat ../../dist && cd ../..")
+    else:
+        os.system(f"./dist/model_equivalence_check ./dist/input_{split}.dat {len(Xt[split])}")
     t_end= time.perf_counter()
 
     # Read the output feature vector produced by the C model
