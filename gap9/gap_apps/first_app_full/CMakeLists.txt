@@ -64,10 +64,10 @@ endif()
 ###############################################################################
 
 # get proper file path
-set(FILENAME_INPUT_DATA    input_train.dat)
-set(FILENAME_INPUT_WEIGHTS weights.dat)
+set(FILENAME_INPUT_DATA        input_train.dat)
+set(FILENAME_INPUT_WEIGHTS     weights.dat)
 set(FILENAME_INPUT_SS_MEANS    means.dat)
-set(FILENAME_INPUT_SS_STDS    stds.dat)
+set(FILENAME_INPUT_SS_STDS     stds.dat)
 set(FILENAME_INPUT_CLASSF_B    weights_bias.dat)
 set(FILENAME_INPUT_CLASSF_W    weights_classf.dat)
 set(FILE_INPUT_DATA     ${CMAKE_CURRENT_SOURCE_DIR}/../../dist/${FILENAME_INPUT_DATA})

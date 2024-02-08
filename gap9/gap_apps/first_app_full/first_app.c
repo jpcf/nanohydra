@@ -27,6 +27,7 @@
 #define NUM_FEATS     2
 #define NUM_CLASSES   5
 #define CONV_FRAC_BITS 10
+#define NUM_SAMPLES 50
 
 #if defined(CONFIG_HELLOWORLD_CLUSTER)
 void pe_entry(void *arg)
@@ -44,8 +45,8 @@ int main()
 {
 
     // Setup perf counters
-    uint32_t cycles, tim_cycles;
-    pi_perf_conf(1 << PI_PERF_CYCLES || 1 << PI_PERF_ACTIVE_CYCLES);
+    float cycles_million = 0.0;
+    uint32_t   cycles = 0, cycles_prev = 0;
 
     // Allocate space for buffer
     int16_t *values;
@@ -160,43 +161,17 @@ int main()
     }
     pi_fs_close(fd[0]);
 
-    /************* SECTION 3: Reading the input data into mem *************/
+    /************* SECTION 3a: Opening Input Data file descriptor *************/
     // Open FD for Flash Section with input vector
-    fd[1] = pi_fs_open(&fs, STR(FILE_INPUT_DATA), 0);
-    if (fd[1] == NULL) {
+    fd[0] = pi_fs_open(&fs, STR(FILE_INPUT_DATA), 0);
+    if (fd[0] == NULL) {
         printf("Error opening file '%s'!\n", STR(FILE_INPUT_DATA));
         return -2;
     }
-    
-    for(int i = 0; i < INPUT_LEN; i++) {
-        pi_fs_read(fd[1], flash_buffer, 2);
-        hydra->inX[0][i+hydra->lenXpad] = (flash_buffer[1] << 8 | flash_buffer[0]);
-        //printf("Read from file @[%d]: %d\n", i, hydra->inX[0][i]);
-    }
-    for (int xi=0; xi < hydra->lenX-1; xi++) {
-        hydra->inX_diff[0][xi+hydra->lenXpad] = hydra->inX[0][xi+1+hydra->lenXpad]-hydra->inX[0][xi+hydra->lenXpad];
-    }
-
-    // Close FD for Flash Section with input vector
-    pi_fs_close(fd[1]);
-    pi_fs_unmount(&fs);
     /**********************************************************************/
-
-    hydra_reset(hydra);
-
-    pi_perf_start();
-    hydra_forward(hydra);
-    hydra_sparse_scale(hydra);
-    hydra_classifier(hydra);
-    pi_perf_stop();
-
-    // Output useful busy time
-    cycles = pi_perf_read(PI_PERF_CYCLES);
-    tim_cycles = pi_perf_read(PI_PERF_ACTIVE_CYCLES);
-    printf("Perf: %d Cycles. Timer: %d cycles\n", cycles, tim_cycles);
-    printf("Activations: %d %d %d %d %d\n",hydra->classf_scores[0],  hydra->classf_scores[1], hydra->classf_scores[2], hydra->classf_scores[3], hydra->classf_scores[4]);
     
-    /************* SECTION 3: Setup of Readfs from File *************/
+
+    /************* SECTION 3b: Setup of Host FS (for output dump) *************/
     /** HostFs dump to PC **/
     pi_device_t host_fs;
     struct pi_hostfs_conf hostfs_conf;
@@ -211,7 +186,7 @@ int main()
     }
     printf("Hostfs mounted\n");
     
-    char *filename = "output_file.txt";
+    char *filename = "output_file.dat";
     fd[1] = pi_fs_open(&host_fs, filename, PI_FS_FLAGS_WRITE);
     if (fd[1] == NULL)
     {
@@ -219,16 +194,61 @@ int main()
         return -4;
     }
     printf("Output file opened\n");
-    /****************************************************************/
+    /**************************************************************************/
 
 
-    /************* SECTION 4: Dumping output data to file *************/
-    // Test output values by writing the input as it was
-    for(int i = 0; i < INPUT_LEN; i++) {
-        pi_fs_write(fd[1], &values[i], sizeof(values[i]));
+    /************* SECTION 4: Performing forward passes on test samples *************/
+    for(int s=0; s < NUM_SAMPLES; s++) {
+        /************* SECTION 4a: Reading the input data into mem *************/
+        for(int i = 0; i < INPUT_LEN; i++) {
+            pi_fs_read(fd[0], flash_buffer, 2);
+            hydra->inX[0][i+hydra->lenXpad] = (flash_buffer[1] << 8 | flash_buffer[0]);
+            //printf("Read from file @[%d]: %d\n", i, hydra->inX[0][i]);
+        }
+        for (int xi=0; xi < hydra->lenX-1; xi++) {
+            hydra->inX_diff[0][xi+hydra->lenXpad] = hydra->inX[0][xi+1+hydra->lenXpad]-hydra->inX[0][xi+hydra->lenXpad];
+        }
+        /***********************************************************************/
+
+
+        /************* SECTION 4b: Performing forward pass *************/
+        hydra_reset(hydra);
+        pi_perf_conf(1 << PI_PERF_CYCLES || 1 << PI_PERF_ACTIVE_CYCLES);
+        pi_perf_start();
+        hydra_forward(hydra);
+        hydra_sparse_scale(hydra);
+        hydra_classifier(hydra);
+        pi_perf_stop();
+        /***************************************************************/
+
+        /************* SECTION 4c: Collect benchmarks *************/
+        cycles = pi_perf_read(PI_PERF_CYCLES);
+        cycles_million  += (float)(cycles-cycles_prev) / 1000000;
+        printf("Processed %6d samples. # Cycles: %ld\n", s, cycles-cycles_prev);
+        cycles_prev = cycles;
+        /**********************************************************/
+
+        /************* SECTION 4d: Dumping output data to file *************/
+        // Test output values by writing the input as it was
+        for(int i = 0; i < hydra->N_classes; i++) {
+            flash_buffer[0] = (hydra->classf_scores[i]      ) & 0xFF;
+            flash_buffer[1] = (hydra->classf_scores[i] >>  8) & 0xFF;
+            flash_buffer[2] = (hydra->classf_scores[i] >> 16) & 0xFF;
+            flash_buffer[3] = (hydra->classf_scores[i] >> 24) & 0xFF;
+            pi_fs_write(fd[1], &hydra->classf_scores[i], sizeof(hydra->classf_scores[i]));
+        }
+        /******************************************************************/
+
     }
+
+    // Close FD for Flash Section with input vector
     pi_fs_close(fd[1]);
-    /******************************************************************/
+    pi_fs_unmount(&fs);
+
+    float avg_cycles = (float)cycles_million / NUM_SAMPLES;
+    float avg_inf_time_ms = (avg_cycles  * 1e6) / 320e6 * 1e3;
+
+    printf("Average inference time: %.3f ms. -- In raw perf cycles: ~= %.3f Million cycles\n", avg_inf_time_ms, avg_cycles);
 
     return 0;
 }
