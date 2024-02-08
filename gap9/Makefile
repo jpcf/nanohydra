@@ -55,7 +55,7 @@ $(BUILDPATH)/hydra_classifier.o:
 	$(CC) $(CFLAGS) -c $(SRCPATH)/hydra_classifier.c -o $(BUILDPATH)/hydra_classifier.o
 
 $(BUILDPATH)/hydra_convolve.o: 
-	$(CC) $(CFLAGS) -c $(SRCPATH)/hydra_convolve.c -o $(BUILDPATH)/hydra_convolve.o
+	$(CC) $(CFLAGS) -fopenmp -c $(SRCPATH)/hydra_convolve.c -o $(BUILDPATH)/hydra_convolve.o
 
 $(BUILDPATH)/hydra_forward.o: 
 	$(CC) $(CFLAGS) -c $(SRCPATH)/hydra_forward.c -o $(BUILDPATH)/hydra_forward.o

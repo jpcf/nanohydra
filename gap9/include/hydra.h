@@ -2,6 +2,14 @@
 #include <stdint.h>
 #include <math.h>
 
+#ifdef TARGET_GAP9
+#include "pmsis.h"
+#include <bsp/bsp.h>
+#else
+#include <stdio.h>
+
+#endif
+
 typedef struct Hydra {
     // Memory allocations
     int16_t   **inX;

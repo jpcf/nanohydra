@@ -13,6 +13,9 @@ void hydra_convolve(int16_t *inX, int8_t **inW, int16_t *featVec, uint16_t dil, 
     int8_t    *inWptr[hydra->K];
     int16_t   *inXptr;
 
+    // OMP for target x64
+    //omp_set_num_threads(8);
+    //#pragma omp parallel for private(h, k, xi, featVecPtr, featVecTmpMax, featVecTmpMin, inXptr, inWptr, min, max, conv_out) firstprivate(dil, curr_diff, argmin, argmax) shared(featVec, inX, inW, hydra)
     for(h=0; h < hydra->H; h++) {
         // Prefetch array at the right location, to avoid access pointer arithmetic for lenX*H times.
         featVecPtr = &(featVec[h*hydra->K*hydra->N_feats]);

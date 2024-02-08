@@ -1,0 +1,234 @@
+/* 
+ * Copyright (C) 2017 ETH Zurich, University of Bologna and GreenWaves Technologies
+ * All rights reserved.
+ *
+ * This software may be modified and distributed under the terms
+ * of the BSD license.  See the LICENSE file for details.
+ *
+ * Authors: Germain Haugou, ETH (germain.haugou@iis.ee.ethz.ch)
+ */
+
+#include "pmsis.h"
+#include <bsp/bsp.h>
+#include "../../include/hydra.h"
+
+#define QUOTE(name) #name
+#define STR(macro) QUOTE(macro)
+
+// Problem Defines
+#define INPUT_SZ  2
+#define INPUT_LEN     140
+#define WEIGH_LEN     9
+#define NUM_CHAN      1
+#define NUM_K         8
+#define NUM_G         16
+#define MAX_DILATIONS 5
+#define NUM_DIFFS     2
+#define NUM_FEATS     2
+#define NUM_CLASSES   5
+#define CONV_FRAC_BITS 10
+
+#if defined(CONFIG_HELLOWORLD_CLUSTER)
+void pe_entry(void *arg)
+{
+    printf("Hello from (%d, %d)\n", pi_cluster_id(), pi_core_id());
+}
+
+void cluster_entry(void *arg)
+{
+    pi_cl_team_fork(0, pe_entry, 0);
+}
+#endif
+
+int main()
+{
+
+    // Setup perf counters
+    uint32_t cycles, tim_cycles;
+    pi_perf_conf(1 << PI_PERF_CYCLES || 1 << PI_PERF_ACTIVE_CYCLES);
+
+    // Allocate space for buffer
+    int16_t *values;
+    int16_t sum=0;
+    values = pi_l2_malloc(INPUT_LEN*INPUT_SZ);
+
+    /************* SECTION 1: Setup of Readfs from File *************/
+    static pi_fs_file_t *fd[2] = {NULL};
+    static struct pi_device fs;
+
+    // Reads one line of input
+    char flash_buffer[32];
+
+    struct pi_readfs_conf conf;
+    pi_readfs_conf_init(&conf);
+
+    // if using default layout, uncoment next line
+    //conf.fs.partition_name = "readfs_mram";
+    // if using custom layout, comment next line
+    conf.fs.partition_name = "readfs_app";
+
+    // Mounting the File System
+    pi_open_from_conf(&fs, &conf);
+    if (pi_fs_mount(&fs))
+        return -1;
+    printf("readfs mounted\n");
+    /****************************************************************/
+
+
+    printf("Data file path: '%s'!\n", STR(FILE_INPUT_DATA));
+    printf("Weights file path: '%s'!\n", STR(FILE_INPUT_WEIGHTS));
+    printf("Weights file path: '%s'!\n", STR(FILE_INPUT_CLASSF_W));
+    printf("Weights file path: '%s'!\n", STR(FILE_INPUT_CLASSF_B));
+
+    /************* SECTION 2: Init Hydra model, load weights *************/
+    // Initialize Hydra model
+    Hydra* hydra;
+    hydra = hydra_init(INPUT_LEN, WEIGH_LEN, NUM_K, NUM_G,
+                       MAX_DILATIONS, NUM_DIFFS, NUM_CHAN,
+                       NUM_FEATS, NUM_CLASSES, CONV_FRAC_BITS);
+
+    printf("Hydra model successfully initialized!\n");
+
+    // STEP A: Load RCK Weights
+    fd[0] = pi_fs_open(&fs, STR(FILE_INPUT_WEIGHTS), 0);
+    if (fd[0] == NULL) {
+        printf("Error opening file '%s'!\n", STR(FILE_INPUT_WEIGHTS));
+        return -2;
+    }
+    else {
+        printf("Weights file opened successfully!\n");
+    }
+
+    for(int h=0; h < hydra->H; h++) {
+        pi_fs_read(fd[0], hydra->inW[h], hydra->K*hydra->lenW);
+    }
+    pi_fs_close(fd[0]);
+
+    // STEP B: Load Sparse Scaler Means
+    fd[0] = pi_fs_open(&fs, STR(FILE_INPUT_SS_MEANS), 0);
+    if (fd[0] == NULL) {
+        printf("Error opening file '%s'!\n", STR(FILE_INPUT_SS_MEANS));
+        return -2;
+    }
+
+    for(int f=0; f < hydra->len_feat_vec; f++) {
+        pi_fs_read(fd[0], flash_buffer, 2);
+        hydra->featMean[f] = (flash_buffer[1] << 8 | flash_buffer[0]);
+        //printf("Read from file (featMean) @[%d]: %d\n", f, hydra->featMean[f]);
+    }
+    pi_fs_close(fd[0]);
+
+    // STEP C: Load Sparse Scaler STDS
+    fd[0] = pi_fs_open(&fs, STR(FILE_INPUT_SS_STDS), 0);
+    if (fd[0] == NULL) {
+        printf("Error opening file '%s'!\n", STR(FILE_INPUT_SS_STDS));
+        return -2;
+    }
+    pi_fs_read(fd[0], hydra->featStd, hydra->len_feat_vec);
+
+    for(int f=0; f < hydra->len_feat_vec; f++) {
+        //printf("Read from file (featStd) @[%d]: %d\n", f, hydra->featStd[f]);
+    }
+    pi_fs_close(fd[0]);
+
+    // STEP D: Load Classifier Weights
+    fd[0] = pi_fs_open(&fs, STR(FILE_INPUT_CLASSF_W), 0);
+    if (fd[0] == NULL) {
+        printf("Error opening file '%s'!\n", STR(FILE_INPUT_CLASSF_W));
+        return -2;
+    }
+
+    for(int c=0; c < hydra->N_classes; c++) {
+        for(int f=0; f < hydra->len_feat_vec; f++) {
+            pi_fs_read(fd[0], flash_buffer, 2);
+            hydra->classf_weights[c][f] = (flash_buffer[1] << 8 | flash_buffer[0]);
+        }
+    }
+    pi_fs_close(fd[0]);
+
+    // STEP E: Load Classifier Biases
+    fd[0] = pi_fs_open(&fs, STR(FILE_INPUT_CLASSF_B), 0);
+    if (fd[0] == NULL) {
+        printf("Error opening file '%s'!\n", STR(FILE_INPUT_CLASSF_B));
+        return -2;
+    }
+
+    for(int c=0; c < hydra->N_classes; c++) {
+        pi_fs_read(fd[0], flash_buffer, 2);
+        hydra->classf_bias[c] = (flash_buffer[1] << 8 | flash_buffer[0]);
+        //printf("Read from file (classfBias) @[%d]: %d\n", c, hydra->classf_bias[c]);
+    }
+    pi_fs_close(fd[0]);
+
+    /************* SECTION 3: Reading the input data into mem *************/
+    // Open FD for Flash Section with input vector
+    fd[1] = pi_fs_open(&fs, STR(FILE_INPUT_DATA), 0);
+    if (fd[1] == NULL) {
+        printf("Error opening file '%s'!\n", STR(FILE_INPUT_DATA));
+        return -2;
+    }
+    
+    for(int i = 0; i < INPUT_LEN; i++) {
+        pi_fs_read(fd[1], flash_buffer, 2);
+        hydra->inX[0][i+hydra->lenXpad] = (flash_buffer[1] << 8 | flash_buffer[0]);
+        //printf("Read from file @[%d]: %d\n", i, hydra->inX[0][i]);
+    }
+    for (int xi=0; xi < hydra->lenX-1; xi++) {
+        hydra->inX_diff[0][xi+hydra->lenXpad] = hydra->inX[0][xi+1+hydra->lenXpad]-hydra->inX[0][xi+hydra->lenXpad];
+    }
+
+    // Close FD for Flash Section with input vector
+    pi_fs_close(fd[1]);
+    pi_fs_unmount(&fs);
+    /**********************************************************************/
+
+    hydra_reset(hydra);
+
+    pi_perf_start();
+    hydra_forward(hydra);
+    hydra_sparse_scale(hydra);
+    hydra_classifier(hydra);
+    pi_perf_stop();
+
+    // Output useful busy time
+    cycles = pi_perf_read(PI_PERF_CYCLES);
+    tim_cycles = pi_perf_read(PI_PERF_ACTIVE_CYCLES);
+    printf("Perf: %d Cycles. Timer: %d cycles\n", cycles, tim_cycles);
+    printf("Activations: %d %d %d %d %d\n",hydra->classf_scores[0],  hydra->classf_scores[1], hydra->classf_scores[2], hydra->classf_scores[3], hydra->classf_scores[4]);
+    
+    /************* SECTION 3: Setup of Readfs from File *************/
+    /** HostFs dump to PC **/
+    pi_device_t host_fs;
+    struct pi_hostfs_conf hostfs_conf;
+    pi_hostfs_conf_init(&hostfs_conf);
+
+    pi_open_from_conf(&host_fs, &hostfs_conf);
+
+    if (pi_fs_mount(&host_fs))
+    {
+        printf("Failed to mount host fs\n");
+        return -3;
+    }
+    printf("Hostfs mounted\n");
+    
+    char *filename = "output_file.txt";
+    fd[1] = pi_fs_open(&host_fs, filename, PI_FS_FLAGS_WRITE);
+    if (fd[1] == NULL)
+    {
+        printf("Failed to open file, OUTPUT\n");
+        return -4;
+    }
+    printf("Output file opened\n");
+    /****************************************************************/
+
+
+    /************* SECTION 4: Dumping output data to file *************/
+    // Test output values by writing the input as it was
+    for(int i = 0; i < INPUT_LEN; i++) {
+        pi_fs_write(fd[1], &values[i], sizeof(values[i]));
+    }
+    pi_fs_close(fd[1]);
+    /******************************************************************/
+
+    return 0;
+}

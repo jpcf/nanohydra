@@ -1,5 +1,4 @@
 #include "../include/hydra.h"
-#include <stdio.h>
 
 void hydra_forward(Hydra *hydra) {
 
@@ -13,9 +12,6 @@ void hydra_forward(Hydra *hydra) {
         dil = generate_dilation_val(dil_idx);
         for (diff_idx = 0; diff_idx < hydra->N_diff; diff_idx++) {
             for (chan = 0; chan < hydra->N_chan; chan++) {
-                // Parallelization point for OMP Tasks. Since Chan and Dil are highly variable from
-                // problem to problem, this is a more generic solution for both Single and Multichannel problems.
-                //printf("Current Iteration")
                 if(diff_idx == 0) {
                     hydra_convolve(hydra->inX[chan],      
                                    hydra->inW, 
