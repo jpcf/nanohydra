@@ -7,8 +7,10 @@
 #include <bsp/bsp.h>
 #else
 #include <stdio.h>
-
+#include <omp.h>
 #endif
+
+#include "hydra_defines.h"
 
 typedef struct Hydra {
     // Memory allocations
@@ -16,8 +18,8 @@ typedef struct Hydra {
     int16_t   **inX_diff;
     int8_t    **inW;
     int16_t    *featVec;
-    int16_t   **classf_weights;
-    int16_t    *classf_bias;
+    int8_t   **classf_weights;
+    int8_t    *classf_bias;
     int32_t    *classf_scores;
 
     // Attributes

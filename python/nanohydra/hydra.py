@@ -96,7 +96,7 @@ class NanoHydra():
 
     __KERNEL_LEN = 9
 
-    def __init__(self, input_length, num_channels=1,  k = 8, g = 64, max_dilations=8, seed = None, dist = "normal", classifier="Logistic", scaler="Sparse", dtype=np.int16, verbose=True, classifier_args=None):
+    def __init__(self, input_length, num_channels=1,  k = 8, g = 64, max_dilations=8, num_diffs = 2, seed = None, dist = "normal", classifier="Logistic", scaler="Sparse", dtype=np.int16, verbose=True, classifier_args=None):
 
         self.cfg = NanoHydraCfg(seed= seed, scalertype=scaler, classifiertype=classifier, classifier_args=classifier_args)
         self.dist = dist
@@ -110,6 +110,7 @@ class NanoHydra():
         self.k = k # num kernels per group
         self.g = g # num groups
         self.num_channels = num_channels
+        self.num_diffs = num_diffs
 
         max_exponent = np.log2((input_length - 1) / (self.__KERNEL_LEN - 1))
 
@@ -193,12 +194,15 @@ class NanoHydra():
     # transform in batches of *batch_size*
     def forward_batch(self, X, batch_size = 256, do_fit=True, do_scale=False, quantize_scaler = False, frac_bit_shift = 6):
         num_examples = X.shape[0]
-        len_feat_vec = 2*self.k * self.g * self.num_dilations * self.num_channels
-        #len_feat_vec = self.k * self.g * self.num_dilations * self.num_channels
+        self.frac_bit_shift = frac_bit_shift
+        len_feat_vec = self.num_diffs * self.k * self.g * self.num_dilations * self.num_channels
+
+        print(f"Feature vector length: {len_feat_vec}")
+
         Z = np.empty((num_examples, len_feat_vec))
 
         for idx in tqdm(range(0, num_examples, batch_size)):
-            Z[idx:min(idx+batch_size, num_examples), :] = self.forward(X[idx:min(idx+batch_size, num_examples), :, :], frac_bit_shift)
+            Z[idx:min(idx+batch_size, num_examples), :] = self.forward(X[idx:min(idx+batch_size, num_examples), :, :], self.frac_bit_shift)
 
         if(do_fit):
             self.fit_scaler(Z)
@@ -214,7 +218,7 @@ class NanoHydra():
 
         if self.divisor > 1:
             diff_X = np.diff(X, axis=2)
-        
+         
         # Making sure dimensions are coherent
         assert diff_X.shape[0]==X.shape[0],   "DiffX {diff_X.shape[0]} and X {X.shape[0]} must have the same number of examples"
         assert diff_X.shape[1]==X.shape[1],   "DiffX {diff_X.shape[1]} and X {X.shape[1]} must have the same number of channels"
@@ -228,7 +232,7 @@ class NanoHydra():
 
             feats_diff = [None for i in range(self.divisor)]
 
-            for diff_index in range(self.divisor):
+            for diff_index in range(min(self.num_diffs, self.divisor)):
 
                 feats = [None for i in range(self.num_channels)]
                 
@@ -267,14 +271,17 @@ class NanoHydra():
                 else:
                     feats_diff[diff_index] = np.concatenate((feats[0], feats[1], feats[2], feats[3],feats[4], feats[5], feats[6], feats[7]), axis=1)
 
-            feats_dil = np.concatenate((feats_diff[0], feats_diff[1]), axis=1)
+            if(self.num_diffs > 1):
+                feats_dil = np.concatenate((feats_diff[0], feats_diff[1]), axis=1)
+            else:
+                feats_dil = feats_diff[0]
 
             if(dilation_index):
                 Z = np.concatenate((Z,feats_dil), axis=1)
             else:
                 Z = feats_dil
 
-        num_feats = 2*self.k * self.g * self.num_dilations * self.num_channels
+        num_feats = self.num_diffs * self.k * self.g * self.num_dilations * self.num_channels
         assert len(Z[0]) == num_feats, f"Dimensions of feature vector ({len(Z[0])}) do not match expected features {num_feats}"
 
         # Immediately free up RAM by marking the large vectors for deletion and calling the GC.
@@ -313,6 +320,21 @@ class NanoHydra():
 
     def dump_weights(self):
         return self.W.reshape((self.h*self.k, self.__KERNEL_LEN))
+
+    def dump_defines(self, path):
+        s  = f"#define INPUT_LEN      {self.input_length}\n"
+        s += f"#define WEIGH_LEN      {self.__KERNEL_LEN}\n"
+        s += f"#define NUM_CHAN       {self.num_channels}\n"
+        s += f"#define NUM_K          {self.k}\n"
+        s += f"#define NUM_G          {self.g}\n"
+        s += f"#define NUM_DILATIONS  {self.num_dilations}\n"
+        s += f"#define NUM_DIFFS      {self.num_diffs}\n"
+        s += f"#define NUM_FEATS      2\n"
+        s += f"#define NUM_CLASSES    5\n"
+        s += f"#define CONV_FRAC_BITS {self.frac_bit_shift}\n"
+
+        with open(f"{path}/hydra_defines.h", "w") as f:
+            f.write(s)
 
     def fit_classifier(self, X, Y):
         self.cfg.get_classf().fit(X,Y)

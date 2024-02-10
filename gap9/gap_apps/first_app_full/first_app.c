@@ -11,22 +11,13 @@
 #include "pmsis.h"
 #include <bsp/bsp.h>
 #include "../../include/hydra.h"
+#include "../../include/hydra_defines.h"
 
 #define QUOTE(name) #name
 #define STR(macro) QUOTE(macro)
 
 // Problem Defines
 #define INPUT_SZ  2
-#define INPUT_LEN     140
-#define WEIGH_LEN     9
-#define NUM_CHAN      1
-#define NUM_K         8
-#define NUM_G         16
-#define MAX_DILATIONS 5
-#define NUM_DIFFS     2
-#define NUM_FEATS     2
-#define NUM_CLASSES   5
-#define CONV_FRAC_BITS 10
 #define NUM_SAMPLES 500
 
 #if defined(CONFIG_HELLOWORLD_CLUSTER)
@@ -85,7 +76,7 @@ int main()
     // Initialize Hydra model
     Hydra* hydra;
     hydra = hydra_init(INPUT_LEN, WEIGH_LEN, NUM_K, NUM_G,
-                       MAX_DILATIONS, NUM_DIFFS, NUM_CHAN,
+                       NUM_DILATIONS, NUM_DIFFS, NUM_CHAN,
                        NUM_FEATS, NUM_CLASSES, CONV_FRAC_BITS);
 
     printf("Hydra model successfully initialized!\n");
@@ -141,8 +132,7 @@ int main()
 
     for(int c=0; c < hydra->N_classes; c++) {
         for(int f=0; f < hydra->len_feat_vec; f++) {
-            pi_fs_read(fd[0], flash_buffer, 2);
-            hydra->classf_weights[c][f] = (flash_buffer[1] << 8 | flash_buffer[0]);
+            pi_fs_read(fd[0], &(hydra->classf_weights[c][f]), 1);
         }
     }
     pi_fs_close(fd[0]);
@@ -155,8 +145,7 @@ int main()
     }
 
     for(int c=0; c < hydra->N_classes; c++) {
-        pi_fs_read(fd[0], flash_buffer, 2);
-        hydra->classf_bias[c] = (flash_buffer[1] << 8 | flash_buffer[0]);
+        pi_fs_read(fd[0], &(hydra->classf_bias[c]), 1);
         //printf("Read from file (classfBias) @[%d]: %d\n", c, hydra->classf_bias[c]);
     }
     pi_fs_close(fd[0]);

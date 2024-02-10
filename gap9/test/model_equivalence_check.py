@@ -15,10 +15,11 @@ NUM_CHAN  = 1
 K=8
 G=16
 MAX_DILATIONS = 5
-DO_QUANTIZE=True
+NUM_DIFFS     = 2
+DO_QUANTIZE   = True
 
 DIST_FOLDER = "./dist/"
-SPLITS = ["train"]
+SPLITS = ["train"] #, "test"]
 RUN_ON_TARGET_GAP9 = True
 
 def check_rck_output(Y, Yc):
@@ -87,7 +88,7 @@ print(fp)
 del fp
 
 # Initialize the kernel transformer, scaler and classifier
-model  = NanoHydra(input_length=input_length, num_channels=NUM_CHAN, k=K, g=G, max_dilations=MAX_DILATIONS, dist="binomial", classifier="Logistic", scaler="Sparse", seed=int(time.time()), dtype=np.int16, verbose=False)    
+model  = NanoHydra(input_length=input_length, num_channels=NUM_CHAN, k=K, g=G, max_dilations=MAX_DILATIONS, num_diffs=NUM_DIFFS, dist="binomial", classifier="Logistic", scaler="Sparse", seed=int(time.time()), dtype=np.int16, verbose=False)    
 
 # Transform and scale
 print(f"Transforming {Xtrain.shape[0]} training examples...")
@@ -103,6 +104,7 @@ model.quantize_classifier(8)
 # Dump model params
 Wq, bq =model.dump_classifier_weights()
 W = model.dump_weights()
+model.dump_defines("./include")
 
 fp = np.memmap(f"dist/weights.dat", dtype='int8', mode="w+", shape=(W.shape[0], W.shape[1]))
 fp[:] = W[:,:]
@@ -121,15 +123,18 @@ fp[:] = sigmas[:]
 fp.flush()
 del fp
 
-fp = np.memmap(f"dist/weights_classf.dat", dtype='int16', mode="w+", shape=(Wq.shape[0], Wq.shape[1]))
+fp = np.memmap(f"dist/weights_classf.dat", dtype='int8', mode="w+", shape=(Wq.shape[0], Wq.shape[1]))
 fp[:] = Wq[:,:]
 fp.flush()
 del fp
 
-fp = np.memmap(f"dist/weights_bias.dat", dtype='int16', mode="w+", shape=(bq.shape[0]))
+fp = np.memmap(f"dist/weights_bias.dat", dtype='int8', mode="w+", shape=(bq.shape[0]))
 fp[:] = bq[:]
 fp.flush()
 del fp
+
+# Compile C model with generated .h file defines
+os.system(f"make model_equivalence_check")
 
 # Run C model, which will dump the output feature vector 
 for split in SPLITS:

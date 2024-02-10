@@ -69,11 +69,11 @@ Hydra* hydra_init(
 
     // Allocate classifier attribute structures
     hydra->classf_scores  = (int32_t*)  MALLOC(sizeof(int32_t)  * hydra->N_classes);
-    hydra->classf_bias    = (int16_t*)  MALLOC(sizeof(int16_t)  * hydra->N_classes);
-    hydra->classf_weights = (int16_t**) MALLOC(sizeof(int16_t*) * hydra->N_classes);
+    hydra->classf_bias    = (int8_t*)  MALLOC(sizeof(int8_t)  * hydra->N_classes);
+    hydra->classf_weights = (int8_t**) MALLOC(sizeof(int8_t*) * hydra->N_classes);
 
     for(int c=0; c < hydra->N_classes; c++) {
-        hydra->classf_weights[c] = (int16_t*) MALLOC(sizeof(int16_t) * hydra->len_feat_vec);
+        hydra->classf_weights[c] = (int8_t*) MALLOC(sizeof(int8_t) * hydra->len_feat_vec);
     }
 
     return hydra;

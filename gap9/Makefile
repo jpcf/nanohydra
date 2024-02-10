@@ -48,7 +48,7 @@ run_classf_equiv_test: classf_equivalence_check
 run_scaler_equiv_test: scaler_equivalence_check
 	$(PYTHONPATH) test/scaler_equivalence_check.py
 
-run_model_equiv_test: model_equivalence_check
+run_model_equiv_test: 
 	$(PYTHONPATH) test/model_equivalence_check.py
 
 $(BUILDPATH)/hydra_classifier.o: 
