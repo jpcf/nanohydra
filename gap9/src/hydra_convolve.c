@@ -1,6 +1,6 @@
 #include "../include/hydra.h"
 
-void hydra_convolve(int16_t *inX, int8_t **inW, int16_t *featVec, uint16_t dil, Hydra* hydra, uint8_t curr_diff) {
+void hydra_convolve(int16_t *inX, int8_t *inW, int16_t *featVec, uint16_t dil, Hydra* hydra, uint8_t curr_diff) {
 
     uint16_t   h,k,wi;
     uint16_t  xi;
@@ -22,7 +22,7 @@ void hydra_convolve(int16_t *inX, int8_t **inW, int16_t *featVec, uint16_t dil, 
         inXptr     = &inX[hydra->lenXpad-4*dil-4];
 
         for(k=0; k < hydra->K; k++) {
-            inWptr[k] = &(inW[h][k*hydra->lenW]);
+            inWptr[k] = &(inW[h*hydra->K*hydra->lenW + k*hydra->lenW]);
             featVecTmpMax[k] = 0;
             featVecTmpMin[k] = 0;
         }
@@ -45,7 +45,7 @@ void hydra_convolve(int16_t *inX, int8_t **inW, int16_t *featVec, uint16_t dil, 
                 */
 
                 /* ALTERNATIVE 2 -- UNROLLED LOOP */
-                conv_out = (int32_t)(inXptr[xi]             * inWptr[k][0] + 
+                conv_out = (int32_t)(inXptr[xi            ] * inWptr[k][0] + 
                                      inXptr[xi +   (dil+1)] * inWptr[k][1] + 
                                      inXptr[xi + 2*(dil+1)] * inWptr[k][2] + 
                                      inXptr[xi + 3*(dil+1)] * inWptr[k][3] + 

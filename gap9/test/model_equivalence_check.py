@@ -19,8 +19,8 @@ NUM_DIFFS     = 2
 DO_QUANTIZE   = True
 
 DIST_FOLDER = "./dist/"
-SPLITS = ["train"] #, "test"]
-RUN_ON_TARGET_GAP9 = True
+SPLITS = ["train", "test"]
+RUN_ON_TARGET_GAP9 = False
 
 def check_rck_output(Y, Yc):
 

@@ -37,9 +37,7 @@ int main(int argc, char *argv[]) {
     // Read weights
     fdi = open("./dist/weights.dat", O_RDONLY);
     inPtr_8 = (int8_t*) mmap(NULL, hydra->H*hydra->K*hydra->lenW, PROT_READ, MAP_SHARED, fdi, 0);
-    for(int h=0; h < hydra->H; h++) { 
-        memcpy(hydra->inW[h], &inPtr_8[h*hydra->K*hydra->lenW], hydra->lenW*hydra->K);
-    }
+    memcpy(hydra->inW, inPtr_8, hydra->lenW*hydra->K*hydra->H);
 
     // Read scaler means 
     fdi = open("./dist/means.dat", O_RDONLY);
