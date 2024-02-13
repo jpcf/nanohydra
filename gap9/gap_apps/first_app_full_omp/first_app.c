@@ -36,12 +36,6 @@ void hydra_forward_gap9(void *args) {
     pi_cl_dma_memcpy(&copy_L2_to_L1);
     pi_cl_dma_wait(&copy_L2_to_L1);
 
-    for(int i=0; i < hydra->lenXpad; i++) {
-        inX[i] = 0;
-    }
-    for(int i=hydra->lenXpad+hydra->lenX; i < 2*hydra->lenXpad+hydra->lenX+1; i++) {
-        inX[i] = 0;
-    }
 
 
     copy_L2_to_L1.dir   = PI_CL_DMA_DIR_EXT2LOC;
@@ -54,12 +48,6 @@ void hydra_forward_gap9(void *args) {
     pi_cl_dma_memcpy(&copy_L2_to_L1);
     pi_cl_dma_wait(&copy_L2_to_L1);
 
-    for(int i=0; i < hydra->lenXpad; i++) {
-        inX_diff[i] = 0;
-    }
-    for(int i=hydra->lenXpad+hydra->lenX-1; i < 2*hydra->lenXpad+hydra->lenX; i++) {
-        inX_diff[i] = 0;
-    }
 
     copy_L2_to_L1.dir   = PI_CL_DMA_DIR_EXT2LOC;
     copy_L2_to_L1.merge = 0;
@@ -177,10 +165,20 @@ int main()
                        NUM_DILATIONS, NUM_DIFFS, NUM_CHAN,
                        NUM_FEATS, NUM_CLASSES, CONV_FRAC_BITS);
 
-    //inX      = (int16_t*) pi_l1_malloc(NULL, sizeof(int16_t)*(hydra->lenX+hydra->lenXpad*2+1));
-    //inX_diff = (int16_t*) pi_l1_malloc(NULL, sizeof(int16_t)*(hydra->lenX+hydra->lenXpad*2));
-    //inW      = (int8_t*)  pi_l1_malloc(NULL, hydra->lenW*hydra->K*hydra->H);
-    //featVec  = (int16_t*) pi_l1_malloc(NULL, sizeof(int16_t)*(hydra->len_feat_vec));
+
+    // Zero padding to input vectors in L1
+    for(int i=0; i < hydra->lenXpad; i++) {
+        inX[i] = 0;
+    }
+    for(int i=hydra->lenXpad+hydra->lenX; i < 2*hydra->lenXpad+hydra->lenX+1; i++) {
+        inX[i] = 0;
+    }
+    for(int i=0; i < hydra->lenXpad; i++) {
+        inX_diff[i] = 0;
+    }
+    for(int i=hydra->lenXpad+hydra->lenX-1; i < 2*hydra->lenXpad+hydra->lenX; i++) {
+        inX_diff[i] = 0;
+    }
     printf("Hydra model successfully initialized!\n");
     pi_cluster_close(&cluster_dev);
 
@@ -309,8 +307,8 @@ int main()
         }
 
         hydra_reset(hydra);
-        pi_cluster_task(&cl_task, hydra_forward_gap9, hydra);
         pi_perf_start();
+        pi_cluster_task(&cl_task, hydra_forward_gap9, hydra);
         pi_cluster_send_task_to_cl(&cluster_dev, &cl_task);
         pi_cluster_close(&cluster_dev);
         hydra_sparse_scale(hydra);
