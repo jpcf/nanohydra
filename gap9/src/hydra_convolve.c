@@ -16,7 +16,7 @@ void hydra_convolve(int16_t *inX, int8_t *inW, int16_t *featVec, uint16_t dil, H
 #endif
     uint16_t   h,k,wi;
     uint16_t  xi;
-    int32_t   conv_out = 0;
+    int32_t   conv_out[8] = {0};
     int32_t   max, min;
     uint16_t  argmax=0, argmin=0;
     int16_t   featVecTmpMax[8];
@@ -49,8 +49,8 @@ void hydra_convolve(int16_t *inX, int8_t *inW, int16_t *featVec, uint16_t dil, H
         for(xi=0; xi < 140 - curr_diff; xi += 1) {
             
             // Reset the max and min
-            max = INT32_MIN+1;
-            min = INT32_MAX-1; 
+            argmin = 0;
+            argmax = 0;
 
             // Iterate over kernels in given group
             for(k=0; k < 8; k++) {
@@ -65,32 +65,33 @@ void hydra_convolve(int16_t *inX, int8_t *inW, int16_t *featVec, uint16_t dil, H
                 */
 
                 /* ALTERNATIVE 2 -- UNROLLED LOOP */
-                conv_out = (int32_t)(inXptr[xi           ] * inWptr[k][0] + 
-                                    inXptr[xi +   (dil+1)] * inWptr[k][1] + 
-                                    inXptr[xi + 2*(dil+1)] * inWptr[k][2] + 
-                                    inXptr[xi + 3*(dil+1)] * inWptr[k][3] + 
-                                    inXptr[xi + 4*(dil+1)] * inWptr[k][4] + 
-                                    inXptr[xi + 5*(dil+1)] * inWptr[k][5] + 
-                                    inXptr[xi + 6*(dil+1)] * inWptr[k][6] + 
-                                    inXptr[xi + 7*(dil+1)] * inWptr[k][7] + 
-                                    inXptr[xi + 8*(dil+1)] * inWptr[k][8]);
+                conv_out[k] = (int32_t)(inXptr[xi            ] * inWptr[k][0] + 
+                                        inXptr[xi +   (dil+1)] * inWptr[k][1] + 
+                                        inXptr[xi + 2*(dil+1)] * inWptr[k][2] + 
+                                        inXptr[xi + 3*(dil+1)] * inWptr[k][3] + 
+                                        inXptr[xi + 4*(dil+1)] * inWptr[k][4] + 
+                                        inXptr[xi + 5*(dil+1)] * inWptr[k][5] + 
+                                        inXptr[xi + 6*(dil+1)] * inWptr[k][6] + 
+                                        inXptr[xi + 7*(dil+1)] * inWptr[k][7] + 
+                                        inXptr[xi + 8*(dil+1)] * inWptr[k][8]);
 
                 // Determine if convolutional output is the new winning/losing kernel
-                if(conv_out > max) {
+            }
+
+            for(k=0; k < 8; k++) {
+                if(conv_out[k] > conv_out[argmax]) {
                     // New winner kernel
-                    max    = conv_out;
                     argmax = k;
                 }
-                if(conv_out < min) {
+                if(conv_out[k] < conv_out[argmin]) {
                     // New loser kernel
-                    min    = conv_out;
                     argmin = k;
                 }
             }
 
             // Hard count and soft count. The accumulation is temporarily done here, as this avoids repeating
             // the access pointer arithmetic for lenX*H times. 
-            featVecTmpMax[argmax] += (int16_t) (max >> shift);
+            featVecTmpMax[argmax] += (int16_t) (conv_out[argmax] >> shift);
             featVecTmpMin[argmin] += 1;
         }
 

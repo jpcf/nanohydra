@@ -9,7 +9,7 @@
 
 // Problem Defines
 #define INPUT_SZ  2
-#define NUM_SAMPLES 500
+#define NUM_SAMPLES 21
 #define BUFFER_SZ   1000
 
 static PI_L1 int16_t inX[BUFFER_SZ], inX_diff[BUFFER_SZ], featVec[2*BUFFER_SZ];
@@ -25,46 +25,42 @@ void hydra_forward_gap9(void *args) {
     Hydra* hydra = (Hydra *) args;
     
     // Copy Input Vector and Weights into L1
-    pi_cl_dma_copy_t copy_L2_to_L1;
-    copy_L2_to_L1.dir   = PI_CL_DMA_DIR_EXT2LOC;
-    copy_L2_to_L1.merge = 0;
-    copy_L2_to_L1.size  = (uint16_t) hydra->lenX*2;
-    copy_L2_to_L1.id    = 0;
-    copy_L2_to_L1.ext   = (uint32_t) &(hydra->inX[0][hydra->lenXpad]);
-    copy_L2_to_L1.loc   = (uint32_t) &(inX[hydra->lenXpad]);
+    pi_cl_dma_copy_t copy_L2_to_L1_inX, copy_L2_to_L1_inX_diff, copy_L2_to_L1_inW;
+    copy_L2_to_L1_inX.dir   = PI_CL_DMA_DIR_EXT2LOC;
+    copy_L2_to_L1_inX.merge = 0;
+    copy_L2_to_L1_inX.size  = (uint16_t) hydra->lenX*2;
+    copy_L2_to_L1_inX.id    = 0;
+    copy_L2_to_L1_inX.ext   = (uint32_t) &(hydra->inX[0][hydra->lenXpad]);
+    copy_L2_to_L1_inX.loc   = (uint32_t) &(inX[hydra->lenXpad]);
 
-    pi_cl_dma_memcpy(&copy_L2_to_L1);
-    pi_cl_dma_wait(&copy_L2_to_L1);
+    copy_L2_to_L1_inX_diff.dir   = PI_CL_DMA_DIR_EXT2LOC;
+    copy_L2_to_L1_inX_diff.merge = 0;
+    copy_L2_to_L1_inX_diff.size  = (uint16_t) 2*(hydra->lenX-1);
+    copy_L2_to_L1_inX_diff.id    = 1;
+    copy_L2_to_L1_inX_diff.ext   = (uint32_t) &(hydra->inX_diff[0][hydra->lenXpad]);
+    copy_L2_to_L1_inX_diff.loc   = (uint32_t) &(inX_diff[hydra->lenXpad]);
 
+    copy_L2_to_L1_inW.dir   = PI_CL_DMA_DIR_EXT2LOC;
+    copy_L2_to_L1_inW.merge = 0;
+    copy_L2_to_L1_inW.size  = (uint16_t) hydra->lenW*hydra->K*hydra->H;
+    copy_L2_to_L1_inW.id    = 2;
+    copy_L2_to_L1_inW.ext   = (uint32_t) hydra->inW;
+    copy_L2_to_L1_inW.loc   = (uint32_t) inW;
 
+    pi_cl_dma_memcpy(&copy_L2_to_L1_inX);
+    pi_cl_dma_memcpy(&copy_L2_to_L1_inX_diff);
+    pi_cl_dma_memcpy(&copy_L2_to_L1_inW);
+    pi_cl_dma_wait(&copy_L2_to_L1_inX);
+    pi_cl_dma_wait(&copy_L2_to_L1_inX_diff);
+    pi_cl_dma_wait(&copy_L2_to_L1_inW);
 
-    copy_L2_to_L1.dir   = PI_CL_DMA_DIR_EXT2LOC;
-    copy_L2_to_L1.merge = 0;
-    copy_L2_to_L1.size  = (uint16_t) 2*(hydra->lenX-1);
-    copy_L2_to_L1.id    = 0;
-    copy_L2_to_L1.ext   = (uint32_t) &(hydra->inX_diff[0][hydra->lenXpad]);
-    copy_L2_to_L1.loc   = (uint32_t) &(inX_diff[hydra->lenXpad]);
-
-    pi_cl_dma_memcpy(&copy_L2_to_L1);
-    pi_cl_dma_wait(&copy_L2_to_L1);
-
-
-    copy_L2_to_L1.dir   = PI_CL_DMA_DIR_EXT2LOC;
-    copy_L2_to_L1.merge = 0;
-    copy_L2_to_L1.size  = (uint16_t) hydra->lenW*hydra->K*hydra->H;
-    copy_L2_to_L1.id    = 0;
-    copy_L2_to_L1.ext   = (uint32_t) hydra->inW;
-    copy_L2_to_L1.loc   = (uint32_t) inW;
-
-    pi_cl_dma_memcpy(&copy_L2_to_L1);
-    pi_cl_dma_wait(&copy_L2_to_L1);
     for(int i=0; i < hydra->len_feat_vec; i++) {
         featVec[i] = 0;
     }
 
     TeamForkArgs_T fork_args;
-    fork_args.inW      = inW;
-    fork_args.hydra    = hydra;
+    fork_args.inW   = inW;
+    fork_args.hydra = hydra;
 
     for (dil_idx = 0; dil_idx < hydra->N_dil; dil_idx++) {
         dil = generate_dilation_val(dil_idx);
@@ -96,7 +92,6 @@ void hydra_forward_gap9(void *args) {
 
     pi_cl_dma_memcpy(&copy_L1_to_L2);
     pi_cl_dma_wait(&copy_L1_to_L2);
-
 }
 
 int main()
