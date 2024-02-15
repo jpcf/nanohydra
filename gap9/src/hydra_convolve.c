@@ -4,10 +4,10 @@
 void hydra_convolve(void *args) {
     TeamForkArgs_T *kargs = (TeamForkArgs_T*) args;
 
-    Hydra* hydra       = kargs->hydra;
-    int16_t *inX       = kargs->inX; 
-    int8_t *inW        = kargs->inW; 
-    int16_t *featVec   = kargs->featVec; 
+    Hydra* hydra                     = kargs->hydra;
+    int16_t * __restrict__ inX       = kargs->inX; 
+    int16_t * __restrict__ inW       = (int16_t*) kargs->inW; 
+    int16_t * __restrict__ featVec   = kargs->featVec; 
     uint16_t dil       = kargs->dil;
     uint16_t curr_diff = kargs->diff_idx;
 
@@ -17,13 +17,12 @@ void hydra_convolve(int16_t *inX, int8_t *inW, int16_t *featVec, uint16_t dil, H
     uint16_t   h,k,wi;
     uint16_t  xi;
     int32_t   conv_out[8] = {0};
-    int32_t   max, min;
     uint16_t  argmax=0, argmin=0;
     int16_t   featVecTmpMax[8];
     int16_t   featVecTmpMin[8];
-    int16_t   *featVecPtr;
-    int8_t    *inWptr[hydra->K];
-    int16_t   *inXptr;
+    int16_t   * __restrict__ featVecPtr;
+    int16_t   * __restrict__ inWptr[hydra->K];
+    int16_t   * __restrict__ inXptr;
 
     uint8_t   shift = hydra->conv_frac_bit_shift;
     uint8_t   feats = hydra->N_feats;
