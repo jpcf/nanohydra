@@ -1,11 +1,12 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <math.h>
-#include <omp.h>
 
 #ifdef TARGET_GAP9
 #include "pmsis.h"
 #include <bsp/bsp.h>
+#else
+#include <omp.h>
 #endif
 
 #include "hydra_defines.h"
@@ -45,9 +46,9 @@ typedef struct Hydra {
 
 #ifdef TARGET_GAP9
 typedef struct {
-    int16_t * __restrict__ inX;
-    int8_t  * __restrict__ inW;
-    int16_t * __restrict__ featVec;
+    int16_t * inX;
+    int8_t  * inW;
+    int16_t * featVec;
     uint8_t  dil;
     Hydra*   hydra;
     uint8_t  diff_idx;
