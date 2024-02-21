@@ -15,7 +15,7 @@ typedef struct Hydra {
     // Memory allocations
     int16_t   **inX;
     int16_t   **inX_diff;
-    int8_t     *inW;
+    int16_t     *inW;
     int16_t    *featVec;
     int8_t   **classf_weights;
     int8_t    *classf_bias;
@@ -47,7 +47,7 @@ typedef struct Hydra {
 #ifdef TARGET_GAP9
 typedef struct {
     int16_t * inX;
-    int8_t  * inW;
+    int16_t  * inW;
     int16_t * featVec;
     uint8_t  dil;
     Hydra*   hydra;

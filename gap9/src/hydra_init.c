@@ -55,7 +55,7 @@ Hydra* hydra_init(
     }    
 
     // Allocate weight vector
-    hydra->inW = (int8_t*) MALLOC(sizeof(int8_t)*hydra->H*hydra->K*(hydra->lenW));
+    hydra->inW = (int16_t*) MALLOC(sizeof(int16_t)*hydra->H*hydra->K*(hydra->lenW));
 
     // Allocate feature vector
     hydra->featVec = (int16_t*) MALLOC(sizeof(int16_t) * hydra->len_feat_vec); 

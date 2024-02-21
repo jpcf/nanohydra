@@ -9,11 +9,11 @@
 
 // Problem Defines
 #define INPUT_SZ  2
-#define NUM_SAMPLES 21
-#define BUFFER_SZ   1000
+#define NUM_SAMPLES 50
+#define BUFFER_SZ   1200
 
 static PI_L1 int16_t inX[BUFFER_SZ], inX_diff[BUFFER_SZ], featVec[2*BUFFER_SZ];
-static PI_L1 int8_t  inW[BUFFER_SZ];
+static PI_L1 int16_t  inW[BUFFER_SZ];
 
 void hydra_forward_gap9(void *args) {
     
@@ -42,7 +42,7 @@ void hydra_forward_gap9(void *args) {
 
     copy_L2_to_L1_inW.dir   = PI_CL_DMA_DIR_EXT2LOC;
     copy_L2_to_L1_inW.merge = 0;
-    copy_L2_to_L1_inW.size  = (uint16_t) hydra->lenW*hydra->K*hydra->H;
+    copy_L2_to_L1_inW.size  = (uint16_t) 2*hydra->lenW*hydra->K*hydra->H;
     copy_L2_to_L1_inW.id    = 2;
     copy_L2_to_L1_inW.ext   = (uint32_t) hydra->inW;
     copy_L2_to_L1_inW.loc   = (uint32_t) inW;
@@ -188,7 +188,7 @@ int main()
         printf("Weights file opened successfully!\n");
     }
 
-    pi_fs_read(fd[0], hydra->inW, hydra->H*hydra->K*hydra->lenW);
+    pi_fs_read(fd[0], hydra->inW, 2*hydra->H*hydra->K*hydra->lenW);
     pi_fs_close(fd[0]);
 
     // STEP B: Load Sparse Scaler Means
@@ -336,7 +336,7 @@ int main()
     pi_fs_unmount(&fs);
 
     float avg_cycles = (float)cycles_million / NUM_SAMPLES;
-    float avg_inf_time_ms = (avg_cycles  * 1e6) / 320e6 * 1e3;
+    float avg_inf_time_ms = (avg_cycles  * 1e6) / 100e6 * 1e3;
 
     printf("Average inference time: %.3f ms. -- In raw perf cycles: ~= %.3f Million cycles\n", avg_inf_time_ms, avg_cycles);
 

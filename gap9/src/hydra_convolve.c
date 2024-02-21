@@ -5,9 +5,9 @@ void hydra_convolve(void *args) {
     TeamForkArgs_T *kargs = (TeamForkArgs_T*) args;
 
     Hydra* hydra       = kargs->hydra;
-    int16_t *inX      = kargs->inX; 
-    int8_t  *inW       = (int8_t*) kargs->inW; 
-    int16_t *featVec  = kargs->featVec; 
+    int16_t *inX       = kargs->inX; 
+    int16_t  *inW      = kargs->inW; 
+    int16_t *featVec   = kargs->featVec; 
     uint16_t dil       = kargs->dil;
     uint16_t curr_diff = kargs->diff_idx;
 
@@ -21,11 +21,15 @@ void hydra_convolve(int16_t *inX, int8_t *inW, int16_t *featVec, uint16_t dil, H
     int16_t   featVecTmpMax[8];
     int16_t   featVecTmpMin[8];
     int16_t  *featVecPtr;
-    int8_t   *inWptr[hydra->K];
+    int16_t   *inWptr[hydra->K];
     int16_t  *inXptr;
 
     uint8_t   shift = hydra->conv_frac_bit_shift;
     uint8_t   feats = hydra->N_feats;
+
+    #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+    v2s opX_P1, opX_P2, opX_P3, opX_P4, opW_P1[8], opW_P2[8], opW_P3[8], opW_P4[8];
+    int16_t opW_rem[8];
 
     // OMP for target x64
     //omp_set_num_threads(8);
@@ -40,7 +44,11 @@ void hydra_convolve(int16_t *inX, int8_t *inW, int16_t *featVec, uint16_t dil, H
 
         //printf("featVectPtr addr=%p, core %d, chunk %d\n", featVec, pi_core_id(), h);
         for(k=0; k < hydra->K; k++) {
-            inWptr[k] = &(inW[h*hydra->K*hydra->lenW + k*hydra->lenW]);
+            opW_P1[k] = *((v2s*) &inW[h*hydra->K*hydra->lenW + k*hydra->lenW  ]);
+            opW_P2[k] = *((v2s*) &inW[h*hydra->K*hydra->lenW + k*hydra->lenW+2]);
+            opW_P3[k] = *((v2s*) &inW[h*hydra->K*hydra->lenW + k*hydra->lenW+4]);
+            opW_P4[k] = *((v2s*) &inW[h*hydra->K*hydra->lenW + k*hydra->lenW+6]);
+            opW_rem[k] = inW[h*hydra->K*hydra->lenW + k*hydra->lenW+8];
             featVecTmpMax[k] = 0;
             featVecTmpMin[k] = 0;
         }
@@ -50,6 +58,11 @@ void hydra_convolve(int16_t *inX, int8_t *inW, int16_t *featVec, uint16_t dil, H
             // Reset the max and min
             argmin = 0;
             argmax = 0;
+
+            opX_P1 = __builtin_pulp_pack2(inXptr[xi            ], inXptr[xi +   (dil+1)]);
+            opX_P2 = __builtin_pulp_pack2(inXptr[xi + 2*(dil+1)], inXptr[xi + 3*(dil+1)]);
+            opX_P3 = __builtin_pulp_pack2(inXptr[xi + 4*(dil+1)], inXptr[xi + 5*(dil+1)]);
+            opX_P4 = __builtin_pulp_pack2(inXptr[xi + 6*(dil+1)], inXptr[xi + 7*(dil+1)]);
 
             // Iterate over kernels in given group
             for(k=0; k < 8; k++) {
@@ -64,17 +77,12 @@ void hydra_convolve(int16_t *inX, int8_t *inW, int16_t *featVec, uint16_t dil, H
                 */
 
                 /* ALTERNATIVE 2 -- UNROLLED LOOP */
-                conv_out[k] = (int32_t)(inXptr[xi            ] * inWptr[k][0] + 
-                                        inXptr[xi +   (dil+1)] * inWptr[k][1] + 
-                                        inXptr[xi + 2*(dil+1)] * inWptr[k][2] + 
-                                        inXptr[xi + 3*(dil+1)] * inWptr[k][3] + 
-                                        inXptr[xi + 4*(dil+1)] * inWptr[k][4] + 
-                                        inXptr[xi + 5*(dil+1)] * inWptr[k][5] + 
-                                        inXptr[xi + 6*(dil+1)] * inWptr[k][6] + 
-                                        inXptr[xi + 7*(dil+1)] * inWptr[k][7] + 
-                                        inXptr[xi + 8*(dil+1)] * inWptr[k][8]);
-
-                // Determine if convolutional output is the new winning/losing kernel
+                conv_out[k] = 0;
+                conv_out[k] = __builtin_pulp_sdotsp2(opX_P1 , opW_P1[k], conv_out[k]);
+                conv_out[k] = __builtin_pulp_sdotsp2(opX_P2 , opW_P2[k], conv_out[k]);
+                conv_out[k] = __builtin_pulp_sdotsp2(opX_P3 , opW_P3[k], conv_out[k]);
+                conv_out[k] = __builtin_pulp_sdotsp2(opX_P4 , opW_P4[k], conv_out[k]);
+                conv_out[k] += inXptr[xi + 8*(dil+1)] * opW_rem[k];
             }
 
             for(k=0; k < 8; k++) {
