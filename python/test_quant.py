@@ -8,8 +8,9 @@ import time
 from nanohydra.hydra import NanoHydra
 from mlutils.quantizer import LayerQuantizer
 
-DATASETS        = ["ECG5000"]
+DATASETS        = ["OliveOil"]
 DO_QUANTIZE     = True
+DO_PLOT_QUANT   = False
 
 X  = {'test': {}, 'train': {}}
 y  = {'test': {}, 'train': {}}
@@ -46,24 +47,25 @@ if __name__ == "__main__":
             Xtrain = lq_input.quantize(Xtrain)
             Xtest  = lq_input.quantize(Xtest)
             print(f"Input Vector Quant.: {lq_input}")
-            accum_bits_shift = lq_input.get_fract_bits()
+            accum_bits_shift = lq_input.get_fract_bits()-1
 
         # Initialize the kernel transformer, scaler and classifier
-        model  = NanoHydra(input_length=input_length, num_channels=1, k=8, g=16, max_dilations=8, dist="binomial", classifier="Logistic", scaler="Sparse", seed=int(time.time()), dtype=np.int16, verbose=False)    
+        model  = NanoHydra(input_length=input_length, num_channels=1, k=8, g=64, max_dilations=10, num_diffs=2, dist="binomial", classifier="Logistic", scaler="Sparse", seed=int(time.time()), dtype=np.int16, verbose=False)    
 
         # Transform and scale
         print(f"Transforming {Xtrain.shape[0]} training examples...")
         Xt  = model.forward_batch(Xtrain, 500, do_fit=True, do_scale=True, quantize_scaler=True, frac_bit_shift=accum_bits_shift)
         
-        print(f"Feature Vect Train: {np.min(Xt)} -- {np.max(Xt)}")
-        plt.figure(1)
-        plt.plot(model.cfg.get_scaler().muq / accum_bits_shift)
-        plt.title("Mu")
-        
-        plt.figure(2)
-        plt.plot(model.cfg.get_scaler().sigmaq)
-        plt.title("Sigma")
-        plt.show()
+        if(DO_PLOT_QUANT):
+            print(f"Feature Vect Train: {np.min(Xt)} -- {np.max(Xt)}")
+            plt.figure(1)
+            plt.plot(model.cfg.get_scaler().muq / accum_bits_shift)
+            plt.title("Mu")
+            
+            plt.figure(2)
+            plt.plot(model.cfg.get_scaler().sigmaq)
+            plt.title("Sigma")
+            plt.show()
 
         # Fit the classifier
         model.fit_classifier(Xt, Ytrain)

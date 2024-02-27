@@ -14,13 +14,13 @@ INPUT_LEN = 140
 NUM_CHAN  = 1
 K=8
 G=16
-MAX_DILATIONS = 5
-NUM_DIFFS     = 2
+MAX_DILATIONS = 3
+NUM_DIFFS     = 1
 DO_QUANTIZE   = True
 
 DIST_FOLDER = "./dist/"
-SPLITS = ["train", "test"]
-RUN_ON_TARGET_GAP9 = False
+SPLITS = ["train"] #"test"]
+RUN_ON_TARGET_GAP9 = True
 
 def check_rck_output(Y, Yc):
 
@@ -106,7 +106,7 @@ Wq, bq =model.dump_classifier_weights()
 W = model.dump_weights()
 model.dump_defines("./include")
 
-fp = np.memmap(f"dist/weights.dat", dtype='int8', mode="w+", shape=(W.shape[0], W.shape[1]))
+fp = np.memmap(f"dist/weights.dat", dtype='int16', mode="w+", shape=(W.shape[0], W.shape[1]))
 fp[:] = W[:,:]
 fp.flush()
 del fp
@@ -142,13 +142,14 @@ for split in SPLITS:
     
     t_start = time.perf_counter()
     if(RUN_ON_TARGET_GAP9):
-        os.system(f"cd ./gap_apps/first_app_full && cmake --build build --target run && cp build/output.dat ../../dist && cd ../..")
+        os.system(f"cd ./gap_apps/first_app_full_omp && cmake --build build --target run && cp build/output.dat ../../dist && cd ../..")
     else:
         os.system(f"./dist/model_equivalence_check ./dist/input_{split}.dat {len(Xt[split])}")
     t_end= time.perf_counter()
 
     # Read the output feature vector produced by the C model
     Yc = np.memmap(f"./dist/output.dat", dtype='int32', mode="r", shape=(len(Xt[split]), 5))
+    #Yc = np.memmap(f"./dist/output.dat", dtype='int32', mode="r", shape=(50, 5))
 
     nerr = check_rck_output(model.activ, Yc)
 
@@ -160,6 +161,7 @@ for split in SPLITS:
     else:
         Yground_truth = Ytrain.astype(np.uint8)-1
 
+    #acc = model.score_manual(Yc, Yground_truth[:50], method='prob')
     acc = model.score_manual(Yc, Yground_truth, method='prob')
     print(f"Prediction accuracy for '{split}': {acc*100:.2f} %")
 
