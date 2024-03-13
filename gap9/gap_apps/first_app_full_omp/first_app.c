@@ -12,6 +12,7 @@
 #define NUM_SAMPLES 50
 #define BUFFER_SZ   1200
 
+#ifdef PARALLELIZE
 static PI_L1 int16_t inX[BUFFER_SZ], inX_diff[BUFFER_SZ], featVec[2*BUFFER_SZ];
 static PI_L1 int16_t  inW[BUFFER_SZ];
 
@@ -93,6 +94,7 @@ void hydra_forward_gap9(void *args) {
     pi_cl_dma_memcpy(&copy_L1_to_L2);
     pi_cl_dma_wait(&copy_L1_to_L2);
 }
+#endif
 
 int main()
 {
@@ -161,6 +163,7 @@ int main()
                        NUM_FEATS, NUM_CLASSES, CONV_FRAC_BITS);
 
 
+    #ifdef PARALLELIZE
     // Zero padding to input vectors in L1
     for(int i=0; i < hydra->lenXpad; i++) {
         inX[i] = 0;
@@ -176,7 +179,7 @@ int main()
     }
     printf("Hydra model successfully initialized!\n");
     pi_cluster_close(&cluster_dev);
-
+    #endif
     
     // STEP A: Load RCK Weights
     fd[0] = pi_fs_open(&fs, STR(FILE_INPUT_WEIGHTS), 0);
@@ -303,9 +306,13 @@ int main()
 
         hydra_reset(hydra);
         pi_perf_start();
+        #ifdef PARALLELIZE
         pi_cluster_task(&cl_task, hydra_forward_gap9, hydra);
         pi_cluster_send_task_to_cl(&cluster_dev, &cl_task);
         pi_cluster_close(&cluster_dev);
+        #else
+        hydra_forward(hydra);
+        #endif
         hydra_sparse_scale(hydra);
         hydra_classifier(hydra);
         pi_perf_stop();

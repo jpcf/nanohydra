@@ -27,17 +27,19 @@ ifdef BENCHMARK_AVG_RUNS
 CFLAGS+=-DBENCHMARK_AVG_RUNS=$(BENCHMARK_AVG_RUNS)
 endif
 
-ifdef SCHEDULING
-CFLAGS+=-DSCHEDULING=$(SCHEDULING)
-endif
-
 ifndef OUTFOLDER
 OUTFOLDER=$(OUTPATH)
 endif 
 
-ifdef LOOP_COLLAPSE
-CFLAGS+=-DLOOP_COLLAPSE=$(LOOP_COLLAPSE)
-endif 
+
+# Code performance enhancing options
+ifdef VECTORIZE
+CFLAGS+=-DVECTORIZE=$(VECTORIZE)
+endif
+
+ifdef PARALLELIZE
+CFLAGS+=-DPARALLELIZE=$(PARALLELIZE)
+endif
 
 run_forward_equiv_test: forward_equivalence_check
 	$(PYTHONPATH) test/forward_equivalence_check.py

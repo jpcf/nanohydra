@@ -71,11 +71,11 @@ Hydra* hydra_init(
 
 void hydra_reset(Hydra *hydra);
 
-#ifdef TARGET_GAP9
+#if defined (TARGET_GAP9) && defined (PARALLELIZE)
 void hydra_convolve(void* args);
 #else
 void hydra_convolve(int16_t   *inX, 
-                    int8_t    *inW, 
+                    int16_t    *inW, 
                     int16_t   *featVec, 
                     uint16_t   dil,
                     Hydra     *hydra,

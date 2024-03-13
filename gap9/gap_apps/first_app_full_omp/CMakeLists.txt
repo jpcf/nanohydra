@@ -35,7 +35,7 @@ set(HYDRA_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 set(TARGET_SRCS first_app.c  ${HYDRA_SRCS}/hydra_init.c 
                              ${HYDRA_SRCS}/hydra_reset.c 
                              ${HYDRA_SRCS}/hydra_utils.c 
-#                            ${HYDRA_SRCS}/hydra_forward.c 
+                             ${HYDRA_SRCS}/hydra_forward.c 
                              ${HYDRA_SRCS}/hydra_convolve.c 
                              ${HYDRA_SRCS}/hydra_sparse_scale.c 
                              ${HYDRA_SRCS}/hydra_classifier.c)
@@ -87,6 +87,8 @@ add_compile_definitions(FILE_INPUT_CLASSF_W=${FILENAME_INPUT_CLASSF_W})
 
 # Pre-compiler switches to enable GAP9-port specific funcionalities
 add_compile_definitions(TARGET_GAP9=1)
+add_compile_definitions(VECTORIZE=1)
+add_compile_definitions(PARALLELIZE=1)
 
 # Add file to the readfs filesystem
 readfs_add_files(FILES ${FILE_INPUT_DATA} ${FILE_INPUT_WEIGHTS} ${FILE_INPUT_SS_MEANS} ${FILE_INPUT_SS_STDS} ${FILE_INPUT_CLASSF_W} ${FILE_INPUT_CLASSF_B} FLASH mram PARTITION readfs_app)

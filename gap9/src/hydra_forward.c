@@ -1,5 +1,7 @@
 #include "../include/hydra.h"
 
+#if defined (TARGET_GAP9) && defined (PARALLELIZE)
+#else
 void hydra_forward(Hydra *hydra) {
 
     uint8_t dil_idx;
@@ -32,3 +34,4 @@ void hydra_forward(Hydra *hydra) {
         }
     }
 }
+#endif
