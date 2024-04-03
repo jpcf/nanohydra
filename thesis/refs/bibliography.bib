@@ -219,4 +219,116 @@ deep learning to EEG datasets in future research},
   keywords    = {cs.CL, cs.HC},
 }
 
+@Article{Zhang2017,
+  author      = {Yundong Zhang and Naveen Suda and Liangzhen Lai and Vikas Chandra},
+  title       = {Hello Edge: Keyword Spotting on Microcontrollers},
+  date        = {2017-11-20},
+  eprint      = {1711.07128v3},
+  eprintclass = {cs.SD},
+  eprinttype  = {arXiv},
+  abstract    = {Keyword spotting (KWS) is a critical component for enabling speech based user interactions on smart devices. It requires real-time response and high accuracy for good user experience. Recently, neural networks have become an attractive choice for KWS architecture because of their superior accuracy compared to traditional speech processing algorithms. Due to its always-on nature, KWS application has highly constrained power budget and typically runs on tiny microcontrollers with limited memory and compute capability. The design of neural network architecture for KWS must consider these constraints. In this work, we perform neural network architecture evaluation and exploration for running KWS on resource-constrained microcontrollers. We train various neural network architectures for keyword spotting published in literature to compare their accuracy and memory/compute requirements. We show that it is possible to optimize these neural network architectures to fit within the memory and compute constraints of microcontrollers without sacrificing accuracy. We further explore the depthwise separable convolutional neural network (DS-CNN) and compare it against other neural network architectures. DS-CNN achieves an accuracy of 95.4%, which is ~10% higher than the DNN model with similar number of parameters.},
+  file        = {online:http\://arxiv.org/pdf/1711.07128v3:PDF},
+  groups      = {SpeechCommands_Implementations},
+  keywords    = {cs.SD, cs.CL, cs.LG, cs.NE, eess.AS},
+}
+
+@Article{Andrade2018,
+  author      = {Douglas Coimbra de Andrade and Sabato Leo and Martin Loesener Da Silva Viana and Christoph Bernkopf},
+  title       = {A neural attention model for speech command recognition},
+  date        = {2018-08-27},
+  eprint      = {1808.08929v1},
+  eprintclass = {eess.AS},
+  eprinttype  = {arXiv},
+  abstract    = {This paper introduces a convolutional recurrent network with attention for speech command recognition. Attention models are powerful tools to improve performance on natural language, image captioning and speech tasks. The proposed model establishes a new state-of-the-art accuracy of 94.1% on Google Speech Commands dataset V1 and 94.5% on V2 (for the 20-commands recognition task), while still keeping a small footprint of only 202K trainable parameters. Results are compared with previous convolutional implementations on 5 different tasks (20 commands recognition (V1 and V2), 12 commands recognition (V1), 35 word recognition (V1) and left-right (V1)). We show detailed performance results and demonstrate that the proposed attention mechanism not only improves performance but also allows inspecting what regions of the audio were taken into consideration by the network when outputting a given category.},
+  file        = {online:http\://arxiv.org/pdf/1808.08929v1:PDF},
+  groups      = {SpeechCommands_Implementations},
+  keywords    = {eess.AS, cs.SD},
+}
+
+@Article{Tang2018,
+  author      = {Raphael Tang and Jimmy Lin},
+  title       = {Deep Residual Learning for Small-Footprint Keyword Spotting},
+  date        = {2017-10-28},
+  eprint      = {1710.10361v2},
+  eprintclass = {cs.CL},
+  eprinttype  = {arXiv},
+  abstract    = {We explore the application of deep residual learning and dilated convolutions to the keyword spotting task, using the recently-released Google Speech Commands Dataset as our benchmark. Our best residual network (ResNet) implementation significantly outperforms Google's previous convolutional neural networks in terms of accuracy. By varying model depth and width, we can achieve compact models that also outperform previous small-footprint variants. To our knowledge, we are the first to examine these approaches for keyword spotting, and our results establish an open-source state-of-the-art reference to support the development of future speech-based interfaces.},
+  file        = {online:http\://arxiv.org/pdf/1710.10361v2:PDF},
+  groups      = {SpeechCommands_Implementations},
+  keywords    = {cs.CL},
+}
+
+@Thesis{Jansson2018,
+  author = {Patrick Jansson},
+  title  = {Single-word speech recognition with convolutional neural networks on raw waveforms},
+  year   = {2018},
+  groups = {SpeechCommands_Implementations},
+}
+
+@Article{Dempster2020,
+  author    = {Dempster, Angus and Petitjean, François and Webb, Geoffrey I.},
+  title     = {ROCKET: exceptionally fast and accurate time series classification using random convolutional kernels},
+  journal   = {Data Mining and Knowledge Discovery},
+  year      = {2020},
+  volume    = {34},
+  number    = {5},
+  month     = jul,
+  pages     = {1454--1495},
+  issn      = {1573-756X},
+  doi       = {10.1007/s10618-020-00701-z},
+  file      = {:pdfs/Dempster2020-Rocket.pdf:PDF},
+  publisher = {Springer Science and Business Media LLC},
+}
+
+@Article{Fawaz2020,
+  author    = {Ismail Fawaz, Hassan and Lucas, Benjamin and Forestier, Germain and Pelletier, Charlotte and Schmidt, Daniel F. and Weber, Jonathan and Webb, Geoffrey I. and Idoumghar, Lhassane and Muller, Pierre-Alain and Petitjean, François},
+  title     = {InceptionTime: Finding AlexNet for time series classification},
+  journal   = {Data Mining and Knowledge Discovery},
+  year      = {2020},
+  volume    = {34},
+  number    = {6},
+  month     = sep,
+  pages     = {1936--1962},
+  issn      = {1573-756X},
+  doi       = {10.1007/s10618-020-00710-y},
+  file      = {:pdfs/inceptiontime-1909.04939.pdf:PDF},
+  publisher = {Springer Science and Business Media LLC},
+}
+
+@InProceedings{Saxe2011random,
+  author    = {Saxe, Andrew M and Koh, Pang Wei and Chen, Zhenghao and Bhand, Maneesh and Suresh, Bipin and Ng, Andrew Y},
+  title     = {On random weights and unsupervised feature learning.},
+  booktitle = {Proceedings of the 28th InternationalConference on Machine Learning},
+  year      = {2011},
+  file      = {:pdfs/nipsdlufl10-RandomWeights.pdf:PDF},
+}
+
+@Misc{UCRArchive2018,
+  author = {Dau, Hoang Anh and Keogh, Eamonn and Kamgar, Kaveh and Yeh, Chin-Chia Michael and Zhu, Yan and Gharghabi, Shaghayegh and Ratanamahatana, Chotirat Ann and Yanping and Hu, Bing and Begum, Nurjahan and Bagnall, Anthony and Mueen, Abdullah and Batista, Gustavo, and Hexagon-ML},
+  title  = {The UCR Time Series Classification Archive},
+  year   = {2018},
+  note   = {\url{https://www.cs.ucr.edu/~eamonn/time_series_data_2018/}},
+  month  = {October},
+}
+
+@WWW{GWGAP9,
+  title = {Greenwave Technologies Product Line},
+  date  = {2024-04-01},
+  url   = {https://greenwaves-technologies.com/low-power-processor/},
+}
+
+@Book{hiperfpython,
+  author   = {Micha Gorelick, Ian Ozsvald},
+  title    = {High Performance Python},
+  year     = {2020},
+  date     = {2020-04-30},
+  editor   = {O'Reilly Media},
+  subtitle = {Practical performand Programming for Humans},
+}
+
 @Comment{jabref-meta: databaseType:biblatex;}
+
+@Comment{jabref-meta: groupstree:
+0 AllEntriesGroup:;
+1 ExplicitGroup:SpeechCommands_Implementations\;0\;;
+}

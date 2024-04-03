@@ -1,8 +1,237 @@
 \chapter{Implementation}
 \label{ch:implementation}
 
-This chapter explains your contributions, be it algorithms, architectures, libraries, hardware, or others.
-As usual, follow a top-down approach and break the chapter into meaningful sections.
-It may even be necessary to split the chapter into multiple chapters (e.g., to separate architecture from implementation in a hardware design).
+\section{Embedded Refactoring - From Hydra to NanoHydra}\label{sec:im_nanohydra}
 
-Derive a structure for this chapter that is meaningful for your report and discuss it with your advisors.
+    Despite the already good efficiency of Hydra as is, we still identified several potential opportunities for optimization. Some of these optimizations are
+    made purely on the algorithmic side, which focus on simplifying superfluous actions, steps and methods that do not penalize accuracy - they are covered in Section \ref{sec:im_nanohydra_algopt}.
+    While others relate to the model quantization, which despite being done in preparation for an efficient embedded deployment of the model, can benefit the deployment of the model in any platform - they are covered in Section \ref{sec:im_nanohydra_qnt}, and the subsequent subsections.
+    To the new formulation of the model, encompassing all the optimizations and quantizations, we call \textbf{NanonHydra}, to differentiate from the original Hydra model. Only the optimizations are highlighted, and anything else
+
+    \subsection{Algorithm Optimizations}\label{sec:im_nanohydra_algopt}
+
+        \subsubsection{Stage 1: Random Convolutional Kernel Transform}\label{sec:im_nanohydra_algopt_s1}
+        
+        Like in Rocket \cite{Dempster2020}, Hydra uses kernel weights sampled from the standard normal distribution ($\mathcal{N}(0,1)$) so they can take any real value from that distribution.
+        However, the successor algorithm MiniRocket \cite{Dempster2021MR} has shown that RCK-based algorithms can use just integer values sampled from the  set $\{-2,1\}$ without accuracy loss. 
+        In fact, it might not even make sense to strictly talk about ``accuracy loss'', since the RCK stage is \emph{quasi}-deterministic, in the sense that the kernel values simply transform the data to be trained later by the classifier,
+        which already tries to accomodate the trasformed features, by whichever method they were transformed, provided that the kernel can at least crudely approximate the patterns of the input data series (see Section \ref{sec:ha_rck}).
+        Furthermore, the specific choice of the set of weights $\{-2,1\}$ in \cite{Dempster2021MR} seemed rather arbitrary and unsubstantiated in experimental results, as the authors simply \emph{recommend} using those values in a way that 
+        the values of each kernel sum to zero (i.e. setting 3 weights as -2 and 6 weights as 1, but permutting their locations) in order to subtract any offset the input data might have.
+
+        Therefore, in NanonHydra, we have chosen then to use kernel weights uniformly samples from $\{-1,1\}$, instead of using real numbers sampled from $\mathcal{N}(0,1)$. The benefits of this optimization are twofold
+
+        \begin{itemize}
+            \item Reduced memory/flash requirements to store the kernel weights, since \verb|uint8| are enough.
+            \item In section \ref{sec:im_nanohydra_qnt_s1}, when we discuss the input quantization, this allows us to use integer multiplications instead of floating-point multiplications.
+        \end{itemize}
+
+        \subsubsection{Stage 2: Sparse Scaling}\label{sec:im_nanohydra_algopt_s2}
+
+        In the sparse scaling layer, two optimizations are performed
+
+        \begin{itemize}
+        \item \textbf{Omission of the Elementwise Square Root operation} --
+        Before the feature vector is used, the original model applies a \textbf{square root} to its elements. 
+        The authors in \cite{Dempster2023Hydra} offer no justification to that operation, but one can imagine it is done as a way of reducing the magnitude of the feature values: 
+        like in dictionary methods, these result from the accumulation of statistics over the entire length of the input data. 
+        However, performing a square root operation carries two inconveniences: it is a relatively costly operation, and it would require the feature vector 
+        to use \verb|floating-point| storage so that the square-root operation result remained consistent with the operations done during the training stage.
+        We therefore choose to \textbf{omit this operation}, and transform it into an \textbf{arithmetic shift}, which is much less costy and achieves the same purpose.
+        In fact, this operation is actually performed in Stage 1 while the values are accumulated in the feature vector, and is the consequence of the quantization
+        of this vector which will be further elaborated in Section \ref{sec:im_nanohydra_qnt_s1}
+
+        \item \textbf{Normalization approximated by an arithmetic shift} --
+        The purpose of the per-feature normalization is to transform back to the same scale features that can be in 
+        radically different scales (e.g. soft-counting accumulates convolution outupt values, while hard-counting simply accumulates only ones). 
+        Therefore, in order for the Logistic Regression classifier to be able to be \textbf{trained effectively}, these features need to be \textbf{normalized to the same scale}; 
+        this is in fact the purpose of the normalization, and as such, it does not matter so much that the normalization is mathematically accurate, as long as the features are \emph{approximately} in the same scale. 
+        Furthermore, the training of the classifier is performed \textbf{after} this scaling, so it can learn any normalization schemes.
+
+        In the normalization operations, the costlier operation is the division by the standard deviation. We can avoid it by approximating the standard deviation by the closest
+        power of two (i.e. instead of using $\sigma$ we use $\sigma\sb{approx} = 2\sp{\text{floor}(\text{log}\sb{2}(\sigma))}$), so that we can replace this division by an arithmetic 
+        shift, $x / 2\sp{\sigma\sb{approx}} = x >> \sigma\sb{approx}$, when $x$ is positive - when $x$ is negative, arithmetic shifts are not equivalent to divisions by powers of two because they do not round to zero, 
+        so we have to perform the full division, \textbf{but we have replaced a floating-point division with an integer one}!
+
+        \end{itemize}
+
+        \subsubsection{Stage 3: Classifier}\label{sec:im_nanohydra_algopt_s3}
+        No specific algorithmic optimization was introduced in this stage. In Section \ref{sec:im_nanohydra_qnt_s3}, the quantization scheme of this stage is discussed.
+
+    \subsection{Quantization}\label{sec:im_nanohydra_qnt}
+
+        \subsubsection{Stage 1: Random Convolutional Kernel Transform}\label{sec:im_nanohydra_qnt_s1}
+
+        As discussed in Section \ref{sec:im_nanohydra_algopt_s1}, the kernel weights are fixed to a set of two values, $\{-1,1\}$. Although the purpose was 
+        algorithmic simplification and the possibility of performing operations with fixed-point integers, it can also be seen as a quantization step. 
+        However, it is a quantization step done \textbf{before} the training process - recall that the RCK transform the inputs 
+        into a feature vector, and these feature vectors are then collectively used as the training set - and so the training \textbf{already takes into account} the quantization; this
+        stands in stark contrast with other methods (e.g. Recursive Neural Networks, Deep Learning Methods, CNNs) where weight quantization is a undesirable step performed \textbf{after} the training process has concluded, and 
+        done on the \emph{trained} full-precision floating point training parameters, with the sole purpose of compressing the model size and improve the efficiency of the computations.
+        Besides simplifying the training process (only the last layer, the classifier in Stage 3, is quantized \emph{post-training}), it allows us to perform the most computationally intensive and
+        information extraction critical step in the most efficient way possible.
+
+        Of course, for this to be possible, the input itself needs to be quantized. We have chosen a 16-bit fixed-point quantization scheme, where the inputs are automatically quantized To
+        $Qn.m$ format, by using the training set to evaluate the maximum span of values, which defines the number of integer bits $n$
+        that are needed to represent all values without overflow. It then follows that the number of fractional bits $m$ are calculated knowing that $B=n+m$, where $B$ is the number of bits 
+        of the representation type chosen - in this case $B=16$. The rationale for this choice, over choosing 32 bits for instance, is that we can perform the convolution operations using 
+        2-way SIMD operations, while still maintaining a good level of fidelity in the input signal.
+
+        Recalling Equation \ref{eq:dil_cnn_eq}, we see that the convolution operations are nothing more that a series of 9 multiply accumulate operations, 
+        where both operands are 16 bit signed integers ($\{-1,1\}$ are casted to 16-bit signed integers, to make the computation more efficient). Therefore, the partial calculations
+        must be accumulated in a 32-bit temporary variable to prevent overflows in the intermediate calculations. Furthermore, noting the remarks from \ref{sec:ha_s1}, after the convolutional
+        output has been performed for a given time step, and its value has been accumulated in the feature vector, we have no further use for it. The main benefit from this fact is that we do not 
+        need to store the convolutional outputs for all time-steps, making the memory requirements \textbf{are independent of the input data series length} much more scalable in relation to the input length.
+
+        However, we should note lastly that since the convolutional outputs $y[n]$ are intermediately stored in 32-bit, it can happen that its final value indeed needs more than 16-bits to be stored
+        (e.g. suppose all kernel weights are one, and the input data points are all equal to the maximum positive value of a signed 16-bit integer, the result needs more than 16-bits to be correctly represented).
+        This would require our feature vector to use 32-bit signed representation, which double its memory requirements, compared to using a signed 16-bit representation like the convolution operands. To keep the latter
+        representation, we proposed performing an \textbf{an arithmetic shift} on the convolution output \textbf{before} its accumulation in the feature vector, such that the cast from 32-bit to 16-bit and that subsequent accumulations at that index do not overflow.
+        \footnote{This issue indeed happened during the development, and was one of the issues that consumed some debugging effort, since the Python Model vs C Implementation equivalence check was failing. 
+        The arithmetic shift solution was formulated precisely to tackle this issue}
+        Note that this is done at the expense of discarding some fractional bits, which have proven to cause no accuracy degradation. This is exactly one of the benefits of using a dictionary method for crafting these features: the
+        long term statistics of the occurence of a given pattern dominate over small local variations, making it more resilient to noise. It is in itself a form of implicit \textbf{regularization}.
+
+        % As discussed before, weights are now integer, which is a form of quantization
+        % We need to quantize the input
+        % Choose 16 bits, as this way we can use two-way SIMD
+        % Time samples independent of each other, calculated one by one, convolutional output of current time sample stored as 32 bit to avoid overflow
+        % Accumulatiors have shifts, so that summations does not overflow 16 bits - otherwise, feature vector would double in size (must have been 32 bit)
+
+        \subsubsection{Stage 2: Sparse Scaling}\label{sec:im_nanohydra_qnt_s2}
+        % Means quantized to 16 bit
+        % Arithmetic shift is a form of quantization, std quantized fo 8 bit
+
+        \subsubsection{Stage 3: Classifier}\label{sec:im_nanohydra_qnt_s3}
+
+        The classifier, being a simple matrix-vector multiplication as defined in Section \ref{sec:ha_s3} (vector is the sparse-scaled feature vector, the matrix is the fully-connected layer), can be easily
+        be quantized in 8-bit without overflows and no loss of classification accuracy. This is contingent on the assumption that the Logistic Regression classifier that originated the weights was properly 
+        regularized - which prevents the weights from ever growing exceedingly large - and that the feature vector was scaled appropriately, as it is the case - which prevents the weights from ever \emph{needing}
+        to grow exceedingly large. The accumulation variable is chosen to be a signed 32-bit integer for two reasons:
+        
+        \begin{itemize}
+            \item Since we only need one of such variables per output class, and this value is generally, at most, on the order of tens, the memory footprint is still rather small. 
+            \item The number of intermediate MAC operations is the same as the length of the feature vector, which can be up to a thousand elements long, increasing the probability of intermediate calculation
+                  overflows. Therefore, for such a small memory footprint, it is logical to offset that risk.
+        \end{itemize}
+
+        An 8-bit representation is desired, as this allows for 4-way SIMD computations.
+
+\section{Code Implementation}\label{sec:im_nanohydra_codeimp}
+
+    \subsection{General Strategy and Structure}\label{sec:im_nanohydra_genstrat}
+
+    \subsubsection{Python model}
+    The starting point of this work was the python model provided by the Hydra authors. From there, we implemented the algorithmic changes described in Section \ref{sec:im_nanohydra_algopt}
+    which transformed it into the proposed NanoHydra model, and that refactored python model was trained against the entire UCR Dataset Archive. This served as a way to evaluate the correctness of those changes 
+    and the maintenance of an adequate accuracy level accross the entire archive, which was done via a python script infrastructure developed from scratch
+    that automates that procedure. The Python model operates in \textbf{batches} of input samples.
+
+    \subsubsection{Speeding up the Python model with Cython}
+    From the point of view of performance, the critical step is Step 1, the RCK transform. Although this algorithm already trains much faster than other state-of-the-art methods \cite{Dempster2023Hydra},
+    we can further speed-up the training and inference by using Cython\footnote{\href{https://cython.org/}{https://cython.org/}}. This library allows the programmer to write certain performance-critical functons
+    in a python dialect that can be translated to C, and compiled to machine code before run-time. Depending on the skill of the programmer it can completely bypass the Python Interpreter and be run directly in machine code.
+    This is especially useful since the Python Interpreter Lock (PIL) prevents multi-core execution of Python code (one needs to resort to the \verb|multiprocessing|\footnote{\href{https://docs.python.org/3/library/multiprocessing.html}{https://docs.python.org/3/library/multiprocessing.html}} library, and use process
+    based parallelism), but by using Cython we can add \textbf{OpenMP}\footnote{\href{https://www.openmp.org/}{https://www.openmp.org/}} \textbf{directives} that are appended to the sections of the Cython function that exclusively use C, and therefore are outside of the (PIL). This results
+    in easy multi-core parallelization gains, as we would have when using C+OpenMP, while still having the expressiveness and productivity of a Python environment. Lastly, it should be noted that the rationale for using Cython when the original
+    formulation used torch is that of greater flexibility of trying new ideas in a language that closely resembled the target embedded deployment, which would be in C.
+
+    \subsubsection{C implementation}
+    The algorithm implemented in the aforementioned Python model was then ported to C, with the end goal of deploying it in an embedded system. 
+    However, since we must guarantee that the C implementation is equivalent to our Python model, the C implementation is first done in a platform-agnostic way,
+    such that it can be run on a PC, and quickly run across an entire dataset, check its output is equivalent bit-by-bit to the output of the Python model. With this approach, 
+    it is much easier to debug and has greatly sped up the development and debug cycle (e.g. the \textbf{entire} ECG5000 dataset can be inferred in 0.5 seconds, versus 10 minutes in the GAP9 simulator).
+    
+    Furthermore, the current C code is highly portable and configurable, and we can switch between the operation modes at compile time by toggling \textbf{compilation switches}.
+    The existing operations modes are summarized in Table \ref{tbl:compile_switches}
+
+    \begin{table}[h!]
+    \begin{tabular}{||p{1.5in}|p{4in}||}
+        \hline
+        Compilation Switch & Function  \\
+
+        \hline\hline
+        \verb|TARGET_GAP9| & When defined, enables GAP9-specific code sections. When not defined, code compiles in agnostic mode \\
+        \hline
+        \verb|PARALLELIZE| & When defined, enables parallelization of the RCK computations. \\
+        \hline
+        \verb|VECTORIZE|   & When defined, enables vectorization across all computation stages of the algorithm. \\
+        \hline
+    \end{tabular}
+    \caption{Compilation Switches}
+    \label{tbl:compile_switches}
+    \end{table}
+
+    The C implementation of the NanoHydra code is distributed in a library. Its constituent functions, and their description, is
+    provided in Table \ref{tbl:library_c}
+
+    \begin{table}[h!]
+    \begin{tabular}{||p{1.5in}|p{4in}||}
+        \hline
+        Function & Description  \\
+
+        \hline\hline
+        \verb|hydra_init| & Initializes the state variables, and allocates the necessary memory. \\
+        \hline
+        \verb|hydra_reset| & Resets the state vectors, should be called after one input sample has been processed, and before starting the processing of the next one. \\
+        \hline
+        \verb|hydra_convolve|   & Computes the RCK over all kernel groups, for a given $N\sb{\text{diff}}$ and dilation $d$. Internal function, meant to be called inside \verb|hydra_forward|\\
+        \hline
+        \verb|hydra_forward|   & Represents a complete computation of the Stage 1 of the algorithm, computing the RCK over all kernel groups, and for all $N\sb{\text{diff}}$ and $D$\\
+        \hline
+        \verb|hydra_sparse_scale|   & Represents a complete computation of Stage 2 of the algorithm, should be called after \verb|hydra_forward|\\
+        \hline
+        \verb|hydra_classifier|     & Represents a complete computation of Stage 3 of the algorithm, should be called after \verb|hydra_classifier|. Outputs the Logistic Regression scores, which are then use to generate a prediction (e.g. \verb|argmax|).\\
+        \hline
+    \end{tabular}
+    \caption{NanoHydra Library}
+    \label{tbl:library_c}
+    \end{table}
+
+    \subsection{Embedded Implementation}\label{sec:im_nanohydra_embimp}
+
+        \subsubsection{General Optimizations}\label{sec:im_nanohydra_embimp_genopt}
+
+        % Weights copied to L1 Memory
+
+        \subsubsection{Vectorization}\label{sec:im_nanohydra_embimp_vect}
+
+        % Table with vectorization of each stage |stage|SIMD|rationale
+        \begin{table}[H]
+        \begin{tabular}{||p{1.5in}|p{1.5in}|p{2.5in}||}
+            \hline
+            Stage & Vectorized ? & Rationale  \\
+
+            \hline\hline
+            Stage 1 - RCK            & 2-way SIMD & Operands are 16-bit, but not always packed (dilations).\\
+            \hline
+            Stage 2 - Sparse Scaling & No         & Calculation flow is irregular, performance did not improve.\\
+            \hline
+            Stage 3 - Classifier     & 4-way SIMD & Weights are 8-bit, operand vector is 16-bit, but its values span 8-bit, so they are packed on-the-fly.\\
+            \hline
+        \end{tabular}
+        \caption{Vectorization per computation stage}
+        \label{tbl:vect_summary}
+        \end{table}
+
+        \subsubsection{Parallelization}\label{sec:im_nanohydra_embimp_paral}
+
+        % Table with vectorization of each stage |stage|SIMD|rationale
+        \begin{table}[H]
+        \begin{tabular}{||p{1.5in}|p{1.5in}|p{2.5in}||}
+            \hline
+            Stage & Parallelized ? & Rationale  \\
+
+            \hline\hline
+            Stage 1 - RCK            & Yes & Embarrassingly parallel section of the computation. Parallelized across the groups, inside \verb|hydra_convolve|.\\
+            \hline
+            Stage 2 - Sparse Scaling & No  & Computation is much shorter than Stage 1, but the memory traffic to the compute cluster would be significantly higher, offsetting any parallelization gains.\\
+            \hline
+            Stage 3 - Classifier     & No  & Same justification as for Stage 2.\\
+            \hline
+        \end{tabular}
+        \caption{Parallelization per computation stage}
+        \label{tbl:vect_summary}
+        \end{table}
+
+        % Table with parallelization of each stage |stage|level|rationale

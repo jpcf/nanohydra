@@ -1,4 +1,7 @@
 \documentclass[]{iisreport}
+\usepackage{tikz}
+\usepackage{ifthen}
+\usetikzlibrary{calc, patterns, angles, quotes, arrows, matrix, positioning, decorations.pathreplacing}
 
 \title{\LaTeX{} Report Template}
 
@@ -10,7 +13,8 @@
 \reporttype{DAS Thesis}
 
 \professor{Prof.\ Dr.\  Luca Benini, lbenini@iis.ee.ethz.ch}
-\advisor{Xiaying Wang, xia@iis.ee.ethz.ch}
+\advisor{Dr. Xiaying Wang, xia@iis.ee.ethz.ch}
+\advisor{Cristian Cioflan, ccioflan@iis.ee.ethz.ch}
 \advisor{Jannis Schoenleber, janniss@iis.ee.ethz.ch}
 
 \titlelogo{titlepage_logo}
@@ -30,7 +34,7 @@
 
 \input{src/introduction}
 \input{src/background}
-\input{src/related_work}
+%\input{src/related_work}
 \input{src/implementation}
 \input{src/results}
 \input{src/conclusion}
@@ -51,6 +55,6 @@
 \listoftables
 
  % TODO: Remove the `latex_and_writing` bibliography when you no longer need that guide.
-\bibliography{./bib/main,./bib/latex_and_writing}
+\bibliography{./refs/bibliography.bib}
 
 \end{document}

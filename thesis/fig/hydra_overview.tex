@@ -1,0 +1,32 @@
+\begin{tikzpicture}[x=1cm,y=1cm]
+	\coordinate (scal_training_cote) at (0,0); 
+	\coordinate (clas_training_cote) at (0,-2); 
+	\coordinate (inference)          at (0,-4); 
+
+	\draw [blue,thick] ($(scal_training_cote) +  (0,0)$) node[fill=yellow!80!black,align=center] (ids) {Input Data \\ $N \times L_x$};
+	\draw [blue,thick] ($(scal_training_cote) +  (4,0)$) node[fill=yellow!80!black,align=center] (tfs) {Feature Vector \\ $N \times F$};
+	\draw [blue,thick] ($(scal_training_cote) +  (9,0)$) node[fill=yellow!80!black,align=center] (msd) {Mean and Std. Dev. \\ $2 \times N \times F$};
+
+	\draw [blue,thick] ($(clas_training_cote) + (4,0)$) node[fill=yellow!80!black,align=center] (scf) {Scaled Features \\ $N \times F$};
+	\draw [red,thick] ($(clas_training_cote) + (11,0)$) node[fill=yellow!80!black,align=center] (clf) {Classifier \\ Training};
+
+	\draw [blue,thick] ($(inference) +  (0,0)$) node[fill=yellow!80!black,align=center]  (its)  {Input Series \\ $1 \times L_x$};
+	\draw [blue,thick] ($(inference) +  (4,0)$) node[fill=yellow!80!black,align=center]  (stfs) {Feature Vector \\ $1 \times F$};
+	\draw [blue,thick] ($(inference) +  (8,0)$) node[fill=yellow!80!black,align=center]  (sscf) {Scaled Features \\ $1 \times F$};
+	\draw [blue,thick] ($(inference) + (11,0)$) node[fill=yellow!80!black,align=center] (sprd) {Prediction};
+
+	\draw[->] (ids) edge node[above] {Step 1} (tfs);
+	\draw[->] (tfs) edge node[above, align=center] {Calculate \\ Mean and Std} (msd);
+	\draw[->] (msd) edge node[above] {$\frac{X-\mu}{\sigma}$} (scf);
+	\draw[->] (msd) edge node[above] {$\frac{X-\mu}{\sigma}$} (sscf);
+	\draw[->] (scf) -- (clf);
+
+	\draw[->] (its)  edge node[above] {Step 1} (stfs);
+	\draw[->] (stfs) edge node[above] {Step 2} (sscf);
+	\draw[->] (sscf) edge node[above] {Step 3} (sprd);
+
+	\draw[dashed] ($(scal_training_cote)+(-2,1)$) -- ($(scal_training_cote)+(0,1)$) node[above] {\textbf{A.} Scaler Training} -- ($(scal_training_cote)+(12,1)$); 
+	\draw[dashed] ($(clas_training_cote)+(-2,1)$) -- ($(clas_training_cote)+(0,1)$) node[above] {\textbf{B.} Classifier Training} -- ($(clas_training_cote)+(12,1)$); 
+	\draw[dashed] ($(inference)+(-2,1)$)          -- ($(inference)+(0,1)$)          node[above] {\textbf{C.} Inference} -- ($(inference)+(12,1)$); 
+
+\end{tikzpicture}
