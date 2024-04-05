@@ -99,6 +99,16 @@
         % Accumulatiors have shifts, so that summations does not overflow 16 bits - otherwise, feature vector would double in size (must have been 32 bit)
 
         \subsubsection{Stage 2: Sparse Scaling}\label{sec:im_nanohydra_qnt_s2}
+
+        In the sparse scaling step, according to what was already explained in Section \ref{sec:ha_algo_descr}, the normalization requires us to store two trainable vectors: the means $\mu$ and the standard deviations $\sigma\sb{approx}$.
+       
+        Regarding the means, we should recall that our feature vector that results from Step 1 of the algorithm is already quantized into a signed 16-bit integer.
+        Therefore, after all the input samples are transformed after Step 1, the training step simply calculates the per-feature average, clips and casts the resulting
+        values to 16-bit signed integers. We note that the averaging operation conveniently leaves unchanged the place of the point, so no further action is needed: the resulting 
+        values will be zero-centered in whichever fixed-point representation they were before.
+        
+        Regarding the standard deviations, as defined in Section \label{sec:im_nanohydra_algopt_s2}, we approximate by the closest power of two, but we only need to store the power, therefore each element
+        is stored as an 8-bit signed integer.
         % Means quantized to 16 bit
         % Arithmetic shift is a form of quantization, std quantized fo 8 bit
 

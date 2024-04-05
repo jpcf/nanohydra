@@ -16,7 +16,7 @@ in the way it extracts the temporal patterns.
 In the following sections, a more detailed overview of this algorithm is presented. We start by laying out the background of the methods that inspired hydra in Section \ref{sec:ha_related_work} in a high-level conceptual manner, and then provide a more rigorous and analytical formulation for Hydra in Section \ref{sec:ha_algo_descr}.
 
 \subsection{Related Work}\label{sec:ha_related_work}
-\subsubsection{Random Convolutional Kernels}{sec:ha_rck}
+\subsubsection{Random Convolutional Kernels}\label{sec:ha_rck}
 Convolutional Neural Networks (CNNs) have long shown effectiveness in image classification, and \cite{Fawaz2020} notes, with the proposal of "InceptionTime", that this is likely to also be the case with the more generic task of time-series classification, which is a one-dimensional problem instead of the two-dimensional problem of image classification.
 The main principle is that the kernel weights learn unique features from the data, making each class separable in the resulting feature map space, because the most similar a given pattern is with a given window of the input time signal, the larger the output will be, and vice-versa. This can be seen with the basic CNN formula
 
@@ -128,7 +128,12 @@ It is up to the author of a given TinyML model to ascertain its fitness to a spe
 \section{GAP9 Microcontroller}
 
 Lastly, we provide a brief discussion about the chosen deployment platform, the GAP9 microcontroller \cite{GWGAP9}. 
-It is a microcontroller tailored for low-power, high-performance embedded applications, with state-of-the-art power consumption. It is a RISC-V architecture
+It is a microcontroller tailored for low-power, high-performance embedded applications, with state-of-the-art power consumption, composed of 9 RISC-V high-performance
+cores, which support vectorization (SIMD instructions). The 9 cores are distributed in a \textbf{compute cluster} with 8-cores used for parallel computations, and one core
+belonging to the \textbf{fabric controller} domain, which manages the peripherals of the chip and executes the main thread of execution. The compute cluster domain
+can be turned off when needed to save power, and there are three levels of hierarchical RAM. One of those levels, the L1 Memory, belongs exclusively to the compute cluster,
+and its contents are lost whenever the compute cluster is turned off -- this means that we incur on the additional overhead of doing copy-in and copy-out operations at the beginning
+and end of the computations, respectively, which can be streamlined by the DMA module.
 
 \begin{figure}[h!]
     \centering
