@@ -6,16 +6,17 @@ import matplotlib.pyplot as plt
 import sys
 import time
 from nanohydra.hydra import NanoHydra
+from mlutils.quantizer import LayerQuantizer
 
 DATASETS        = ["ECG5000"]
-SHOW_HISTOGRAMS = True
-SHOW_CONFMATRIX = True
+SHOW_HISTOGRAMS = False
+SHOW_CONFMATRIX = False
 SHOW_EXAMPLES   = False
-SHOW_TRANSFORM  = True
-SHOW_COLI_MEAS  = False
+SHOW_TRANSFORM  = False
 USE_CACHED      = False
 SHOW_ALPHAS_RR  = False
-DO_PCA          = False
+DO_QUANTIZE     = True
+DO_SHOW_MU_SIGMA_VALS = False
 
 X  = {'test': {}, 'train': {}}
 y  = {'test': {}, 'train': {}}
@@ -37,10 +38,10 @@ if __name__ == "__main__":
 
         # The split argument splits into the opposite fold. Therefore, we here cross them back
         # together into the correct one.
-        Xtrain = X['test'][ds][:Ns,:].astype(np.float32)
-        Xtest  = X['train'][ds][:Ns,:].astype(np.float32)
-        Ytrain = y['test'][ds][:Ns]
-        Ytest  = y['train'][ds][:Ns]
+        Xtrain = X['train'][ds][:Ns,:].astype(np.float32)
+        Xtest  = X['test'][ds][:Ns,:].astype(np.float32)
+        Ytrain = y['train'][ds][:Ns]
+        Ytest  = y['test'][ds][:Ns]
         print(np.unique(Ytrain))
         print(f"Training fold: {Xtrain.shape}")
         print(f"Testing  fold: {Xtest.shape}")
@@ -61,25 +62,41 @@ if __name__ == "__main__":
             print(f"Testing  Size: {Ytest.shape[0]}")
             print(f"Num   Classes: {len(np.unique(Ytest))}")
 
+        if(DO_QUANTIZE):                
+            lq_input = LayerQuantizer(Xtrain, 16)
+            Xtrain = lq_input.quantize(Xtrain)
+            Xtest  = lq_input.quantize(Xtest)
+            print(f"Input Vector Quant.: {lq_input}")
+
+
         if(SHOW_EXAMPLES):
             plt.figure(3)
-            plt.plot(Xtrain[0])
+            plt.plot(Xtrain[498,0,:])
             #for c in np.unique(Ytest):
             #    idx = 0
             #    while(Ytrain[idx] != c):
             #        idx += 1
             #    plt.plot(Xtrain[idx], label=f"Class {c}")
             plt.legend()
-                
+            plt.show()
 
         # Initialize the kernel transformer, scaler and classifier
-        model  = NanoHydra(input_length=input_length, num_channels=1, k=8, g=8, max_dilations=8, dist="binomial", classifier="Logistic", scaler="Sparse", seed=int(time.time()), dtype=np.float32, verbose=False)    
+        model  = NanoHydra(input_length=input_length, num_channels=1, k=8, g=16, max_dilations=8, dist="binomial", classifier="Logistic", scaler="Sparse", seed=int(time.time()), dtype=np.int16, verbose=False)    
 
         # Transform and scale
         print(f"Transforming {Xtrain.shape[0]} training examples...")
         Xt = model.load_transform(ds, "./work", "train") 
         if(Xt is None or not USE_CACHED):
             Xt  = model.forward_batch(Xtrain, 100, do_fit=True, do_scale=True)
+
+            print(f"Feature Vect Train: {np.min(Xt)} -- {np.max(Xt)}")
+
+            # Quantize the feature vector
+            if(DO_QUANTIZE):
+                lq_featvec = LayerQuantizer(Xt, 16)
+                print(f"Feature Vector Quant.: {lq_featvec}")
+                Xt = lq_featvec.quantize(Xt)
+
             model.save_transform(Xt, ds, "./work", "train")
         else:
             print("Using cached transform...")
@@ -105,17 +122,6 @@ if __name__ == "__main__":
                 ax.axhline(y, color='r', linestyle='-')
             plt.title(f"Transformed Training Set (Ordered by classes)")
 
-        if(SHOW_COLI_MEAS):
-            print(f"Condition Number for the Design Matrix (Transf Features): k={np.linalg.cond(np.hstack([np.ones((Xt.shape[0],1)), Xt]), p=2)}")
-
-        if(DO_PCA):
-            prev_dim = Xt.shape[1]
-            PCATransf = PCA(n_components='mle')
-            PCATransf.fit(Xt)
-            Xt = PCATransf.transform(Xt)
-            assert Xt.shape[1] < prev_dim, f"PCA did not reduce dimensionality ({Xt.shape[1]} vs. {prev_dim})"
-            print(f"New Dimensionality = {Xt.shape[1]} (Reduc. Ratio = { Xt.shape[1]/prev_dim:.2f}")
-
         # Fit the classifier
         model.fit_classifier(Xt, Ytrain)
 
@@ -124,15 +130,20 @@ if __name__ == "__main__":
         Xt = model.load_transform(ds, "./work", "test") 
         if(Xt is None) or not USE_CACHED:
             Xt  = model.forward_batch(Xtest, 100, do_scale=True)
+
+            print(f"Feature Vect Test: {np.min(Xt)} -- {np.max(Xt)}")
+            # Quantize the feature vector
+            if(DO_QUANTIZE):
+                lq_featvec = LayerQuantizer(Xt, 16)
+                print(f"Feature Vector Quant.: {lq_featvec}")
+                Xt = lq_featvec.quantize(Xt)
             model.save_transform(Xt, ds, "./work", "test")
         else:
             print("Using cached transform...")
 
-        if(DO_PCA):
-            Xt = PCATransf.transform(Xt)
-
         Ypred = model.predict_batch(Xt, 100)
         print(f"Ypred shape: {Ypred.shape}")
+        model.quantize_classifier(16)
         score_man = model.score_manual(Ypred, Ytest, "subset")
         score = model.score(Xt, Ytest)
         print(f"Score (Aut) for '{ds}': {100*score:0.02f} %") 	

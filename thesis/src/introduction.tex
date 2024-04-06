@@ -1,27 +1,71 @@
 \chapter{Introduction}
 \label{ch:introduction}
 
-The introduction motivates your work and puts it into a bigger context.
-It should answer the following questions:
-What is the background of this work?
-What is the state of the art?
-Why is this project necessary to advance the state of the art?
-What are the problems that have to be solved and why are they difficult?
-What are your contributions to solve these problems?
-How do you evaluate your solution to show that it is adequate and applicable?
+%The introduction motivates your work and puts it into a bigger context.
+%It should answer the following questions:
+%What is the background of this work?
+%What is the state of the art?
+%Why is this project necessary to advance the state of the art?
+%What are the problems that have to be solved and why are they difficult?
+%What are your contributions to solve these problems?
+%How do you evaluate your solution to show that it is adequate and applicable?
+%
+%An introduction written along these questions naturally follows the \textit{\gls{spse}}\footnote{%
+%  The \acrshort{spse} approach was established in a book~\cite{Hoey83}, but is also briefly summarized in a more recent article~\cite{MP12}, which is available online.
+%} approach.
+%In the \emph{situation}, you set the scene for your work and catch the interest of the readers by showing the importance and generality of the scene.
+%In the \emph{problem}, you spot an issue in the scene and show why and how it significantly taints the scene.
+%In the \emph{solution}, you outline your solution to that issue.
+%Finally, in the \emph{evaluation}, you present the main arguments why the claimed solution actually does solve the problem.
+%
+%In the following chapters, you will elaborate each of the four \gls{spse} elements in detail:
+%In \textsl{Background}, you lay the foundations for an in-depth understanding of the situation and the problem.
+%In \textsl{Related Work}, you show how others have address this (or similar) problems and why their solutions are not sufficient or applicable.
+%In \textsl{Implementation}, you specify your solution, which you then evaluate rigorously for strengths and weaknesses in \textsl{Results}.
+%
+%At the end of the introduction, you should explicitly show this structure to the reader by briefly explaining how this report is organized.
+%Instead of using the general \gls{spse} terminology and the chapter names mentioned above, we urge you to use the domain-specific terminology established in the introduction and point to chapters using cross references (e.g., refering to \cref{ch:background} instead of ``the Background chapter'').
 
-An introduction written along these questions naturally follows the \textit{\gls{spse}}\footnote{%
-  The \acrshort{spse} approach was established in a book~\cite{Hoey83}, but is also briefly summarized in a more recent article~\cite{MP12}, which is available online.
-} approach.
-In the \emph{situation}, you set the scene for your work and catch the interest of the readers by showing the importance and generality of the scene.
-In the \emph{problem}, you spot an issue in the scene and show why and how it significantly taints the scene.
-In the \emph{solution}, you outline your solution to that issue.
-Finally, in the \emph{evaluation}, you present the main arguments why the claimed solution actually does solve the problem.
 
-In the following chapters, you will elaborate each of the four \gls{spse} elements in detail:
-In \textsl{Background}, you lay the foundations for an in-depth understanding of the situation and the problem.
-In \textsl{Related Work}, you show how others have address this (or similar) problems and why their solutions are not sufficient or applicable.
-In \textsl{Implementation}, you specify your solution, which you then evaluate rigorously for strengths and weaknesses in \textsl{Results}.
 
-At the end of the introduction, you should explicitly show this structure to the reader by briefly explaining how this report is organized.
-Instead of using the general \gls{spse} terminology and the chapter names mentioned above, we urge you to use the domain-specific terminology established in the introduction and point to chapters using cross references (e.g., refering to \cref{ch:background} instead of ``the Background chapter'').
+\textbf{Time-Series Classification} algorithms are a family of pattern recognition algorithms, whose purpose is to classify windows of input data streams into categories.
+Such algorithms have a special significance in embedded systems settings, as these often involve the monitoring of incoming data collected from sensors, and acting upon perceived patterns from the data. 
+
+Extracting perceived patterns from data can be a challenging task, and often cannot be done reliably by traditional algorithms: with the advent of machine learning techniques, and the possibility to collect and process vast amounts of data, it 
+has been possible to perform a shift towards statistical learning based approaches (collectively known as \textbf{Machine Learning}, ML), which are more reliable than hard-coded solutions.
+
+However, such Machine Learning algorithms and models are conceived and deployed within the context of \textbf{Personal Computers} or \textbf{Server Platforms}, where metrics like \textit{execution time}, \textit{memory usage} or \textit{power consumption} do not heavily constrain the final solution -- \textit{prediction accuracy} is the most important metric.
+Running such algorithms on resource-constrained \textbf{edge} devices such as microcontrollers is a field of emerging interest, which is known as \textbf{TinyML}. 
+Implementing Machine Learning algorithms in such devices poses a significant challenge to these algorithms, which were developed under the assumption that vast amounts of processing power and memory are available. 
+Therefore, the main problem TinyML wants to solve is how to \textbf{optimize} ML algorithms such that they can be run in resource-constrained devices \textbf{while maintaining an acceptable level of accuracy} - it would be of no use to have a super-optimized algorithm that performs miserably in terms of prediction.
+
+We might pose the question as to what is the purpose of TinyML in the first place. 
+We can see that, if no inference is performed at the edge, all edge data needs to be sent to servers, where it is processed and classified, and this classification is then sent back to the edge device, which then takes an appropriate action depending on it. This comes with several disadvantages:
+
+\begin{itemize}
+  \item \textbf{Unacceptable Inference Time} - in time-critical applications, the round-trip time for sending data over the network might be unacceptable. Furthermore, this delay might be variable depending on the current server load and the network conditions.
+  \item \textbf{Dependence on network availability} - edge devices become effectively useless if no network communication to the processing server is available.
+  \item \textbf{Large amounts of sensor data traffic} - with the proliferation of IoT devices, sensors and actuators, solely relying on Servers for inference will create massive data traffic. If, on the contrary, an edge device running TinyML algorithms is capable of, at least, perform a first filtering of interesting events
+  \item \textbf{Power consumption} - being permanently connected to the network consumes energy, which is especially critical for a battery-powered edge device. Furthermore, the process of transferring data \textit{itself} consumes energy.
+  \item \textbf{Data Privacy} - local data must be sent over the network, and even its encrypted form could be sniffed. Furthermore, the server uses the data in plain-text, which can be stored and used for unintended purposes. Might be especially relevant for biological sensor data, positioning, among others.
+\end{itemize}
+
+In fact, these concerns have already been identified by both industry and academia, and TinyML is a field which has seen an emergence of use-cases. A non-exhaustive list of such uses includes
+
+\begin{itemize}
+  \item \textbf{Keyword Spotting}
+  \item \textbf{Image Classification}
+  \item \textbf{Electrocardiogram Classification}
+  \item \textbf{Gesture Recognition}
+  \item \textbf{Anomaly Detection}
+\end{itemize}
+
+This work aims to present an embedded system optimized implementation of the Hydra algorithm. 
+The Hydra algorithm belongs to the aforementioned \textbf{Time-Series Classification} family of algorithms, and it is a cross between the subfamilies of \textbf{Random Convolutional Kernel} and \textbf{Dictionary} methods. 
+Hydra is characterized by having fast inference times, a low memory footprint and a simple training methodology, since only a small part of the algorithm is trainable. In fact, the algorithm is capable of training and inferring over
+the entire UCR Dataset Archive in just about an hour. These traits make Hydra suitable for a TinyML implementation, and this works aims to not only do that, but improve on the original formulation as originally proposed by the authors
+to further optimized the computational complexity and memory footprint. The TinyML version of Hydra -- which we call \textbf{NanoHydra} -- is then run against the entire UCR Dataset Archive, and compared to those original results, to prove its suitability as a general 
+time-series classification algorithm that performs well over a diversified selection of dataset types. Such an evaluation exists already, but the algorithms used are too computationally heavy to be run on edge devices, so this work proposes the first TinyML
+leaderboard on the UCR Dataset Archive. This work then focuses on the specific results for one of the datasets of that archive, the ECG5000, providing detailed benchmarks about different variants of the implementation, and comparisons with state-of-the-art results.
+
+The chosen target edge platform for this work is the GAP9 Processor, due to its state-of-the art energy efficiency, and the multicore processing capabilities of its compute cluster, which can be fully exploited by the embarrassingly parallel nature of the Hydra algorithm

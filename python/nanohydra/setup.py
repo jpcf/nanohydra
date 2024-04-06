@@ -20,7 +20,11 @@ ext_modules=[Extension("conv1d_opt_orig", ["./nanohydra/optimized_fns/conv1d_opt
                 extra_link_args=['-fopenmp']),
              Extension("soft_counting_opt", ["./nanohydra/optimized_fns/soft_counting_opt_fn.pyx"],
                 extra_compile_args=['-fopenmp'],
-                extra_link_args=['-fopenmp'])]
+                extra_link_args=['-fopenmp']),
+             Extension("combined_counting_opt", ["./nanohydra/optimized_fns/combined_counting_opt_fn.pyx"],
+                extra_compile_args=['-fopenmp'],
+                extra_link_args=['-fopenmp'])
+                ]
 
 
 from Cython.Build import cythonize

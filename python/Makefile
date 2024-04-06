@@ -26,6 +26,9 @@ clean_lib:
 test: 
 	$(PYTHONPATH) test.py 10000
 
+test_quant: 
+	$(PYTHONPATH) test_quant.py all
+
 run_ucr_benchmark: 
 	$(PYTHONPATH) run_ucr_benchmark.py all
 
@@ -51,3 +54,6 @@ test_scaler:
 
 test_data_aug:
 	$(PYTHONPATH) test_data_aug.py
+
+tmse:
+	$(PYTHONPATH) tmse.py

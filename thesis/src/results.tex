@@ -1,36 +1,58 @@
 \chapter{Results}
 \label{ch:results}
 
-In this chapter, you want to show that your implementation meets the objectives.
-Start by briefly describing the type of results you have collected and how these results relate to the objectives.
+\usepackage{csvsimple}
+%In this chapter, you want to show that your implementation meets the objectives.
+%Start by briefly describing the type of results you have collected and how these results relate to the objectives.
+%
+%\section{Evaluation setup}
+%
+%Precisely describe your measurement/evaluation setup in a top-down manner.
+%For example:
+%\begin{itemize}
+%  \item If you used a development platform, which one and how was it configured?
+%  \item Which tools did you use?
+%  \item What input data set / program / signals / \ldots{} did you use?
+%    If your data set is very large, you should fully define and describe it in an appendix chapter and refer to that definition here using simple labels.
+%  \item If your implementation is configurable, which configuration(s) did you evaluate?
+%\end{itemize}
+%
+%The information given here (with references to external work) should be sufficient to reproduce the setup you used for your measurements.
+%
+%\section{UCR Dataset Archive Results}
+%\include{./data/csv_table.tex}
+%
+%
+%Structure the rest of this chapter into sections.
+%For example, each section could discuss a different figure of merit or a different part of your implementation.
+%As usual, discuss structure and content in advance with your advisors.
+%
+%\section{Comparison to related work}
+%
+%Compare your results to those achieved by others working on similar problems.
+%This can be done in a separate section or directly in the sections above.
 
-\section{Evaluation setup}
 
-Precisely describe your measurement/evaluation setup in a top-down manner.
-For example:
-\begin{itemize}
-  \item If you used a development platform, which one and how was it configured?
-  \item Which tools did you use?
-  \item What input data set / program / signals / \ldots{} did you use?
-    If your data set is very large, you should fully define and describe it in an appendix chapter and refer to that definition here using simple labels.
-  \item If your implementation is configurable, which configuration(s) did you evaluate?
-\end{itemize}
+\subchapter{Speech Commands - Edge Implementations}
 
-The information given here (with references to external work) should be sufficient to reproduce the setup you used for your measurements.
+\begin{table}
+\begin{tabular}{||c|c|c|c|c|c|r|r||}
+    \hline
+    Reference & Model & TestAC & Memory & Ops & Year & Citation & Reproducible? \\
 
-\section{Other sections}
+    \hline\hline
+    \cite{Zhang2017}   &        DS-CNN & 94.4\% & 38.6 kB & 5.4M & 2017 & 483 &  \href{https://github.com/ARM-software/ML-KWS-for-MCU}{Yes} \\
+    \cite{Andrade2018} &       Att-RNN & 96.9\% &  202 kB &   ?? & 2018 & 113 &  No \\
+    \cite{Tang2018}    &       ResNet8 & 94.1\% &  110 kB &  30M & 2018 & 241 &  \href{https://github.com/castorini/honk/}{Yes} \\
+    \cite{Tang2018}    & ResNet-Narrow & 90.1\% & 19.9 kB & 5.7M & 2018 & 241 &  \href{https://github.com/castorini/honk/}{Yes} \\
+    \cite{Jansson2018} &    ConvNetRaw & 89.4\% &  700 kB &   5M & 2018 &  19 &  No \\
+    \textbf{Ours}      &     NanoHydra & 88.7\% & 56.1 kB & 2.6M & 2024 & n/a &  Yes \\
+    \hline
+\end{tabular}
+\end{table}
 
-Structure the rest of this chapter into sections.
-For example, each section could discuss a different figure of merit or a different part of your implementation.
-As usual, discuss structure and content in advance with your advisors.
-
-\section{Comparison to related work}
-
-Compare your results to those achieved by others working on similar problems.
-This can be done in a separate section or directly in the sections above.
-
-\section{Current limitations}
-
-Demonstrating that your implementation meets the objectives is usually done by showing a lower bound on a given figure of merit.
-Conversely, you should also illuminate the limitations of your implementation by showing upper bounds on these (or other appropriate) figures of merit.
-Critically examining your ideas and their implementation trying to find their limits is also part of your work!
+%\section{Current limitations}
+%
+%Demonstrating that your implementation meets the objectives is usually done by showing a lower bound on a given figure of merit.
+%Conversely, you should also illuminate the limitations of your implementation by showing upper bounds on these (or other appropriate) figures of merit.
+%Critically examining your ideas and their implementation trying to find their limits is also part of your work!

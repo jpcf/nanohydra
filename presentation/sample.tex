@@ -1,0 +1,549 @@
+%Please use LuaLaTeX or XeLaTeX
+\documentclass[10pt,aspectratio=169]{beamer}
+\usepackage{tikz}
+\usepackage{ifthen}
+\usetikzlibrary{calc, patterns, angles, quotes, arrows, matrix, positioning, decorations.pathreplacing}
+
+\title{The presentation title goes here}
+
+\usetheme{eth}
+
+\colorlet{titlefgcolor}{ETHBlue}
+\colorlet{accentcolor}{ETHRed}
+
+\begin{document}
+
+
+\colorlet{titlefgcolor}{ETHPurple}
+\def\titlefigure{elements/title-page-image-alt}
+\title{Energy-Efficient Edge Computing for Time-Series Classification}
+\date[07/03/2024]{7th March 2024}
+\author{Jose Pedro Castro Fonseca}
+\institute{IIS}
+\titleframe
+
+\tocframe
+
+\section{Problem Description}
+\begin{frame}[fragile]{Problem Description}
+
+	\begin{itemize}
+		\item This thesis aims to provide an embedded system-optimized implementation of the \textbf{Hydra} algorithm.
+		\item Hydra is a \textbf{Time-Series Classifier}, which uses a series of Random Convolutional Kernels to extract features into an array; 
+			  these features are then \textbf{scaled} and presented as input to a \textbf{linear classifier} (Logistic Regression).
+
+		\item  The algorithm has been proposed as one running on General Purpose PC platforms, but comes with many potential advantages for an embedded system implementation:
+		\begin{itemize}
+			\item Very fast inference and training times (on the order of seconds for most UCR Archive Datasets)
+			\item The feature extraction step does not require training, only the last classification layer, which amounts to only 5\% of the computational effort. This means most of the computations are actually deterministic, and not need training.
+		\end{itemize}
+	
+		\item This work aims to optimize this algorithm for an embedded platform, namely the GAP9 processor. The benchmark used is the ECG5000 dataset.
+	\end{itemize}
+\end{frame}
+
+\section{Algorithm Description}
+
+\begin{frame}[fragile]{Algorithm Description - Concept}
+	\begin{itemize}
+		\item \textbf{Step 1} - Feature extraction by Random Convolutional Kernels
+
+		\begin{itemize}
+			\item Perform $H \times K$ convolutions with kernel length $W$, in $H$ groups of $K$ convolutions.
+			\item For each $H$ group, and for each output sample $y_{[k,h]}[i]$ see which of the $k \in [0, K-1]$ groups won (or lost) (\textit{argmax} or \textit{argmin}), and by how much (\textit{max} or \textit{min}).
+			\item Accumulate results on the feature vector at the appropriate location.
+			\item Repeat procedure for different dilation levels of the input vector, and for both itself and the first difference.
+			\item This results in a feature vector of length $L_F = 2N_dHKD$. Notably, its legnth is \textbf{independent} of the \textbf{input sample length}.
+		\end{itemize}
+
+		\item \textbf{Step 2} - Sparse Scaling of the Feature Vector
+
+		\begin{itemize}
+			\item The features in the above feature vector may have very different scales (e.g. some locations accumulate \textit{indices}, while others accumulate \textit{convolution ouput values}).
+			\item \textbf{Normalize} the feature vector on a per-feature basis.
+		\end{itemize}
+		
+		\item \textbf{Step 3} - Classification
+
+		\begin{itemize}
+			\item Given a trained $F \times C$ matrix, where $C$ is the number of classes, multiply it with the scaled feature vector.
+			\item The output prediction is the \textit{argmax} of the resulting	score vector of length $C$.
+		\end{itemize}
+	\end{itemize}
+\end{frame}
+
+
+\begin{frame}[fragile]{Algorithm Description - Concept}
+\begin{figure}[htb]
+\begin{tikzpicture}
+	\coordinate (scal_training_cote) at (0,0); 
+	\coordinate (clas_training_cote) at (0,-2); 
+	\coordinate (inference)          at (0,-4); 
+
+	\draw [blue,thick] ($(scal_training_cote) +  (0,0)$) node[fill=yellow!80!black,align=center] (ids) {Input Data \\ $N \times L_x$};
+	\draw [blue,thick] ($(scal_training_cote) +  (4,0)$) node[fill=yellow!80!black,align=center] (tfs) {Feature Vector \\ $N \times F$};
+	\draw [blue,thick] ($(scal_training_cote) +  (9,0)$) node[fill=yellow!80!black,align=center] (msd) {Mean and Std. Dev. \\ $2 \times N \times F$};
+
+	\draw [blue,thick] ($(clas_training_cote) + (4,0)$) node[fill=yellow!80!black,align=center] (scf) {Scaled Features \\ $N \times F$};
+	\draw [red,thick] ($(clas_training_cote) + (11,0)$) node[fill=yellow!80!black,align=center] (clf) {Classifier \\ Training};
+
+	\draw [blue,thick] ($(inference) +  (0,0)$) node[fill=yellow!80!black,align=center]  (its)  {Input Series \\ $1 \times L_x$};
+	\draw [blue,thick] ($(inference) +  (4,0)$) node[fill=yellow!80!black,align=center]  (stfs) {Feature Vector \\ $1 \times F$};
+	\draw [blue,thick] ($(inference) +  (8,0)$) node[fill=yellow!80!black,align=center]  (sscf) {Scaled Features \\ $1 \times F$};
+	\draw [blue,thick] ($(inference) + (11,0)$) node[fill=yellow!80!black,align=center] (sprd) {Prediction};
+
+	\draw[->] (ids) edge node[above] {Step 1} (tfs);
+	\draw[->] (tfs) edge node[above, align=center] {Calculate \\ Mean and Std} (msd);
+	\draw[->] (msd) edge node[above] {$\frac{X-\mu}{\sigma}$} (scf);
+	\draw[->] (msd) edge node[above] {$\frac{X-\mu}{\sigma}$} (sscf);
+	\draw[->] (scf) -- (clf);
+
+	\draw[->] (its)  edge node[above] {Step 1} (stfs);
+	\draw[->] (stfs) edge node[above] {Step 2} (sscf);
+	\draw[->] (sscf) edge node[above] {Step 3} (sprd);
+
+	\draw[dashed] ($(scal_training_cote)+(-2,1)$) -- ($(scal_training_cote)+(0,1)$) node[above] {\textbf{A.} Scaler Training} -- ($(scal_training_cote)+(12,1)$); 
+	\draw[dashed] ($(clas_training_cote)+(-2,1)$) -- ($(clas_training_cote)+(0,1)$) node[above] {\textbf{B.} Classifier Training} -- ($(clas_training_cote)+(12,1)$); 
+	\draw[dashed] ($(inference)+(-2,1)$)          -- ($(inference)+(0,1)$)          node[above] {\textbf{C.} Inference} -- ($(inference)+(12,1)$); 
+
+\end{tikzpicture}
+\end{figure}
+\end{frame}
+
+\begin{frame}[fragile]{Algorithm Description - Analytical Formulation}
+	\begin{itemize}
+		\item \textbf{Step 1} - Feature extraction by Random Convolutional Kernels (90\% computational effort)
+
+		\begin{itemize}
+			\item Convolutional Outputs $y_{[k,h,d]}[i] = \sum_{j=0}^{W-1} x[i+j\dot d] w[j]$, repeated for all $d \in [1,D-1]$.
+			\item Feature Vector Update
+				\begin{itemize}
+					\item Hard Counting (Min): $F_{[h,d]}[2k+0] += 1$,              where $k = \text{argmin}_k (y_{[k,h,d]}[i])$.
+					\item Soft Counting (Min): $F_{[h,d]}[2k+1] += y_{[k,h,d]}[i]$, where $k = \text{max}_k (y_{[k,h,d]}[i])$.
+				\end{itemize}
+			\item Repeat previous steps for $i \in [0, L_x-1]$. 
+		\end{itemize}
+	\end{itemize}
+		\begin{block}{Note}
+			Note that the value of the convolutional output for the input sample at index $i$ is independent of the outputs at any other index.
+			This means that we \textbf{do not} need to store all values of $y_{[k,h,d]}[i]$. Each update of the feature vector $F$ requires only $k \in [0,K-1]$ outputs at index $i$ of $y$.
+
+		\end{block}
+
+	\begin{itemize}
+		\item \textbf{Step 2} - Sparse Scaling of the Feature Vector (5\% computational effort)
+
+		\begin{itemize}
+			\item $F_{[:,:,:]}[i] = \frac{\text{clip}(F_{[:,:,:]}[i],0) - \mu[i]}{\sigma[i]}$, if $\text{clip}(F_{[:,:,:]}[i],0) > 0$
+			\item $\mu$ and $\sigma$ are arrays of size $L_F$, trained with the transformed training set.
+		\end{itemize}
+		
+		\item \textbf{Step 3} - Classification (5\% computational effort)
+
+		\begin{itemize}
+			\item $\text{argmax}_c (Q[c])$, where $Q = B \cdot F$, and  $B \in \mathcal{M}_{C \times L_F}$.
+		\end{itemize}
+	\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Algorithm Description - Analytical Formulation}
+	\begin{itemize}
+		\item Feature Vector Structure, $F[i],  i \in [0, L_F=2N_dHKD[$
+		\begin{itemize}
+			\item Linearized features, hierarchically appended by Group, Dilation and Difference Index (1st diff, no diff).
+			\item Block of the same colour run on the same time instant.
+			\item Each group $h$ constitutes a dictionary \textbf{word}. It is composed of the concatenated Soft and Hard countings of the $K$ convolutional kernels of the corresponding group $h$. 
+		\end{itemize}
+	\end{itemize}
+
+	\bigskip
+\begin{figure}
+\begin{tikzpicture}
+    [box/.style={rectangle,draw=black, ultra thick, minimum size=1cm}]
+
+	\node[box,fill=yellow] (first) at (0,0) {$h=0$};
+	\node[box,fill=yellow] at (1,0) {$h=1$};
+	\node[box,fill=yellow] at (2,0) {(...)};
+	\node[box,fill=yellow, align=center] at (3,0) {$h=$\\$H-1$};
+	\node[box,fill=orange] at (4,0) {$h=0$};
+	\node[box,fill=orange] at (5,0) {$h=1$};
+	\node[box,fill=orange] at (6,0) {(...)};
+	\node[box,fill=orange, align=center] at (7,0) {$h=$\\$H-1$};
+	\node[rectangle] at (8,0) {(...)};
+	\node[box,fill=yellow] at (9,0) {$h=0$};
+	\node[box,fill=yellow] at (10,0) {$h=1$};
+	\node[box,fill=yellow] at (11,0) {(...)};
+	\node[box,fill=yellow, align=center] at (12,0) {$h=$\\$H-1$};
+
+	%\foreach \x in {0,1,2,3} {
+	%	\ifthenelse{\x < 2}
+	%		{\node[box] at (\x,0) {$h=\x$};}{}
+	%	\ifthenelse{\x = 2}
+	%		{\node[box] at (\x,0) {(...)};}{}
+	%	\ifthenelse{\x = 3}
+	%		{\node[box] at (\x,0) {$h=H-1$};}{}
+	%}
+
+	\draw[->,very thick] (-0.2,1.2) --  node[above,yshift=2mm,align=center]{Thread 0}     (-0.2,.7);
+	\draw[->,very thick]    (1,1.2) --  node[above,yshift=2mm,align=center]{Thread 1}     (1,.7);
+	\draw[->,very thick]    (2.7,1.2) --  node[above,yshift=2mm,align=center]{Thread\\$H-1$} (2.7,.7);
+	\draw[->,very thick] (3.8,1.2) --  node[above,yshift=2mm,align=center]{Thread 0}     (3.8,.7);
+	\draw[->,very thick]    (5,1.2) --  node[above,yshift=2mm,align=center]{Thread 1}     (5,.7);
+	\draw[->,very thick]    (7,1.2) --  node[above,yshift=2mm,align=center]{Thread\\$H-1$} (7,.7);
+	\draw[->,very thick] (3.8,1.2) --  node[above,yshift=2mm,align=center]{Thread 0}     (3.8,.7);
+	\draw[->,very thick]    (5,1.2) --  node[above,yshift=2mm,align=center]{Thread 1}     (5,.7);
+	\draw[->,very thick]    (7,1.2) --  node[above,yshift=2mm,align=center]{Thread\\$H-1$} (7,.7);
+
+	\draw[decorate,decoration={brace,mirror},thick] (-.5,-.7) -- node[below]{$\text{dil}=0$}   (3.5,-.7);
+	\draw[decorate,decoration={brace,mirror},thick] (3.5,-.7) -- node[below]{$\text{dil}=1$}   (7.5,-.7);
+	\draw[decorate,decoration={brace,mirror},thick] (8.5,-.7) -- node[below]{$\text{dil}=D-1$} (12.5,-.7);
+
+
+	\node[box,fill=yellow, align=center] (first_det) at (1,-2) {$k=0$\\Soft};
+	\node[box,fill=yellow, align=center] at (2,-2) {$k=0$\\Hard};
+	\node[box,fill=yellow, align=center] at (3,-2) {$k=1$\\Soft};
+	\node[box,fill=yellow, align=center] at (4,-2) {$k=1$\\Hard};
+	\node[rectangle] at (5,-2) {(...)};
+	\node[box,fill=yellow, align=center] at (6,-2) {$k=$\\$K-1$};
+	\node[box,fill=yellow, align=center] (last_det) at (7,-2) {$k=$\\$K-1$};
+	\draw[->, very thick] (first) -- (first_det);
+
+	\draw[decorate,decoration={brace,mirror},thick] (0.5,-2.8) -- node[below]{Dictionary Word for Group $h=0$} (7.5,-2.8);
+\end{tikzpicture}
+\end{figure}
+\end{frame}
+
+
+\section{Proposed Architecture}
+\begin{frame}[fragile]{Proposed Architecture - General Considerations}
+	The model, as proposed, is run in using single precision, 32-bit floating point inputs, weights and activations. We therefore \textbf{quantize}
+
+	\begin{itemize}
+		\item The inputs as a 16-bit integers.
+		\item The activations as a 16-bit integers.
+		\item The convolutional weights and the logistic regression weights as 8-bit integers.
+	\end{itemize}
+
+	\medskip
+
+	Furthermore, depending on the training run, there is no \textbf{prediction accuracy loss} when using an 8-bit quantized classifier. 
+	
+	\medskip
+
+	The classifier is trained on a \textbf{quantized} feature vector - the previous layer's quantization is already \textbf{embedded} in the training,
+	not an unwanted side effect, when the whole network is quantized \textit{a posteriori}. In simple terms, it is as if the input time-series is quantized, and mapped to a new high-dimensional transformed feature space. This is the new trained input to the classifier.
+
+\begin{itemize}
+    \item Total MACS                 = $2KHWL_xD + L_F \cdot C$.
+    \item Parameters 
+        \begin{itemize}
+            \item (Conv. Kern.)   = $KHW$ (8-bit)
+            \item (Sparse Scaler) = $2L_F$ (8-bit)
+            \item (Classifier)    = $L_F \cdot C$ (8-bit)
+        \end{itemize}
+\end{itemize}
+\end{frame}
+
+\section{Implementation Optimizations}
+
+\subsection{Convolutional Kernels}
+\begin{frame}[fragile]{Implementation Optimizations - Convolutional Kernels}
+	\begin{itemize}
+		\item In the original formulation, weights are sampled from a normal distribution $\mathcal{N}(0,1)$ as single precision floats.
+			\begin{itemize}
+				\item Instead, we sample them from a binomial distribution of two possible values ${-1,1}$, with minimal accuracy loss.
+			\end{itemize}
+            \item The convolution output is represented by a 32-bit integer, to avoid overflow. However, after the computation, we can discard some of the fractional bits so that the feature vector can use 16-bit bins!
+		\item The computation is parallelized over the each of $H$ groups. This yielded a ~6x improvement in inference time.
+		\item The convolution MAC operations are vectorized using 2-way SIMD builtins. This yields a ~1.4X improvement in inference time.
+	\end{itemize}
+
+\end{frame}
+
+\subsection{Sparse Scaler}
+\begin{frame}[fragile]{Implementation Optimizations - Sparse Scaler}
+	\begin{itemize}
+		\item Normalizing requires dividing by the standard deviation. After the \textbf{scaler} training, this value is a floating point number, which adds computational overhead.
+			\begin{itemize}
+				\item Choosing to quantize it transforms this FP division into an integer division, which has less overhead!
+				\item But is the \textit{exact} value really relevant? In fact, the classifier is trained \textbf{after} the scaler is trained.
+				\item \textbf{Idea}: quantize standard deviation to the closest power of two (i.e. $2^d$); we only need to perform an arithmetic shift by $d$!
+				\item \textbf{Caution}: for negative numbers, arithmetic shifts \textbf{are not equivalent} to divisions by powers of two, since they don't round to zero!
+			\end{itemize}
+	\end{itemize}
+\end{frame}
+
+\subsection{Classifier}
+\begin{frame}[fragile]{Implementation Optimizations - Classifier}
+	\begin{itemize}
+		\item The feature vector is a 16-bit integer, since the summary statistics are accumulated directly on it, and \textbf{overflows} might happen.
+		\item However, after normalizations, these features are expected to span between values that fit into 8-bit integers.
+		\item We can therefore use 4-way SIMD builtins.
+		\begin{itemize}
+			\item Weights stored as 8-bit quantized integers $\rightarrow$ already aligned and packed in memory!
+			\item Feature vector needs the additional step of packing the 16-bit values into 8-bit (discarding the most significant byte!).
+		\end{itemize}
+	\end{itemize}
+\end{frame}
+
+\section{Results}
+\begin{frame}[fragile]{Results}
+\begin{center}
+    \begin{tabular}{@{}lllll@{}}
+            \toprule Model & Test Accuracy & Inf. Time (@100MHz) & Multi-core & Memory Usage\\
+            \midrule
+            TCN (Ingolfsson et.al.) & 93.8\% & 20 ms (GAPflow) & Yes (8x) & ~22kB (Flash + Act.) \\
+            TCN (Ingolfsson et.al.) & 93.8\% & 2.7 ms (DORY) & Yes (8x) & ~22kB (Flash + Act.) \\
+            \midrule
+            Ours (Diff=2,D=5)   & 94.7\% & 35.17ms & No & 10kB + 3kB \\
+            Ours (Diff=1,Dil=5) & 94.6\% & 17.66ms & No & 5kB P.+ ~1.8kB Act. \\
+            Ours (Diff=1,Dil=3) & 93.8\% & 10.56ms & No & 3kB P. + ~1.2kB Act. \\
+            Ours (Diff=2,Dil=5)     & 94.7\% & 5.99ms & Yes (8x) & 10kB P. + ~3 kB  Act. \\
+            Ours (Diff=1,Dil=5)     & 94.6\% & 3.08ms & Yes (8x) &  5kB P. + ~1.8kB Act. \\
+            Ours (Diff=1,Dil=3)     & 93.8\% & 1.88ms & Yes (8x) &  3kB P. + ~1.2kB Act. \\
+            Ours (Diff=2,Dil=5)     & 94.7\% & 4.13ms & Yes + SIMD & 10kB P. + ~3 kB  Act. \\
+            Ours (Diff=1,Dil=5)     & 94.6\% & 2.20ms & Yes + SIMD & 5kB P. + ~1.8kB Act. \\
+            Ours (Diff=1,Dil=3)     & 93.8\% & 1.35ms & Yes + SIMD & 3kB P. + ~1.2kB Act.
+        \bottomrule
+    \end{tabular}
+\end{center}
+\end{frame}
+
+\end{document}
+%\begin{frame}[fragile]{}
+%
+%
+%\section{Layout}
+%
+%\begin{frame}[fragile]{Title page}
+%
+%	The cover image can be changed by using the command \verb+\def\titlefigure{...}+ before \verb+\titleframe+, as long as the figure as a 2:1 aspect ratio.
+%	
+%	For example:
+%	\begin{verbatim}
+%		\def\titlefigure{elements/title-page-image-alt}
+%	\end{verbatim}
+%	
+%	\medskip
+%	
+%	If you want a solid color, use \verb+\def\titlefigure{}+
+%	
+%	\medskip
+%
+%	The command	
+%	\begin{verbatim}
+%		\setlength{\titleboxwidth}{0.65\textwidth}
+%	\end{verbatim}
+%	changes the width of the titlebox if you need more space.
+%
+%\end{frame}
+%
+%\begin{frame}[fragile]{Aspect ratio}
+%
+%	The official ETH template only comes in 16:9.
+%	
+%	You can obtain 4:3 slides by passing the option \verb+aspectratio=43+
+%	\begin{verbatim}
+%		\documentclass[11pt,aspectratio=43]{beamer}	
+%	\end{verbatim}
+%		
+%	\bigskip
+%	
+%	In this case, you probably want to use the cover image \verb+\def\titlefigure{elements/title-page-image-43}+
+%	or any other image in 14:10 aspect ratio, for example \verb+\def\titlefigure{elements/title-page-image-alt-43}+
+%	
+%	
+%\end{frame}
+%
+%\section{Text and colors}
+%
+%\begin{frame}[fragile]{Font size}
+%
+%	The font sizes match the official ETH template quite accurately when the default option \verb+11pt+ is used.
+%	
+%	\bigskip
+%	
+%	You can get slightly smaller or larger text by passing the options \verb+10pt+ or \verb+12pt+, respectively.
+%	\begin{verbatim}
+%		\documentclass[10pt,aspectratio=169]{beamer}
+%		\documentclass[11pt,aspectratio=169]{beamer}		% default
+%		\documentclass[12pt,aspectratio=169]{beamer}
+%	\end{verbatim}	
+%	
+%	\bigskip
+%	You can also fine-tune the font sizes by modifying the \verb+beamerfontthemeeth.sty+ file.
+%
+%\end{frame}
+%
+%\begin{frame}[fragile]{Colors}
+%
+%	You need to pick these colors
+%	\begin{itemize}
+%		\item \texttt{accentcolor} (alert text, blocks)
+%		\item \texttt{titlefgcolor} (the box on the title page)
+%		\item \texttt{titlebgcolor} (the background on the title page, in case you don't use an image)
+%	\end{itemize}
+%	Use these commands at the beginning of the document
+%	\begin{verbatim}
+%		\colorlet{titlefgcolor}{ETHGreen}
+%		\colorlet{titlebgcolor}{ETHGreen}
+%		\colorlet{accentcolor}{ETHRed}
+%	\end{verbatim}
+%
+%	\medskip
+%
+%	\begin{tabular}{ll}
+%	\textcolor{ETHBlue}{\rule{4mm}{3mm}} ETH Blue &
+%	\textcolor{ETHGreen}{\rule{4mm}{3mm}} ETH Green \\
+%	\textcolor{ETHPurple}{\rule{4mm}{3mm}} ETH Purple &
+%	\textcolor{ETHGray}{\rule{4mm}{3mm}} ETH Gray \\
+%	\textcolor{ETHRed}{\rule{4mm}{3mm}} ETH Red &
+%	\textcolor{ETHPetrol}{\rule{4mm}{3mm}} ETH Petrol \\
+%	\textcolor{ETHBronze}{\rule{4mm}{3mm}} ETH Bronze
+%	\end{tabular}
+%	
+%\end{frame}
+%
+%\begin{frame}
+%
+%	\frametitle{Title}
+%	\framesubtitle{Subtitle}
+%	
+%	Text and some \alert{alert text}
+%	
+%	\[
+%	m_a^\top h(\cdot)
+%	\]
+%	
+%	
+%	\begin{itemize}
+%	\item list one
+%	\item list another one
+%		\begin{itemize}
+%		\item test 1
+%		\item test 2
+%		\end{itemize}
+%	\end{itemize}
+%
+%\end{frame}
+%
+%\section{Blocks and boxes}
+%
+%\begin{frame}{Title with no subtitle}
+%
+%	\begin{block}{Large box}
+%	Notice that blocks are a bit larger than the text, that's intended.
+%	\end{block}
+%	
+%	Column environments also eat some margins. Use the option \texttt{[onlytextwidth]} if you want to align columns to the wide blocks.
+%	
+%	\begin{columns}[onlytextwidth]
+%	\begin{column}{0.45\textwidth}
+%		\begin{block}{Small box}
+%		With some more text
+%		\end{block}
+%	\end{column}
+%	\begin{column}{0.5\textwidth}
+%		Think outside the box!
+%	\end{column}
+%	\end{columns}
+%
+%\end{frame}
+%
+%\section{Figures and tables}
+%
+%\begin{frame}{And, of course, figures!}
+%
+%	\begin{columns}
+%		\begin{column}{0.33\textwidth}
+%			\includegraphics[width=\columnwidth]{example-image-a}
+%		\end{column}
+%		\begin{column}{0.33\textwidth}
+%			\includegraphics[width=\columnwidth]{example-image-b}
+%		\end{column}
+%		\begin{column}{0.33\textwidth}
+%			\includegraphics[width=\columnwidth]{example-image-c}
+%		\end{column}
+%	\end{columns}
+%
+%\end{frame}
+%
+%\begin{frame}
+%
+%	\frametitle{Tables}
+%	\framesubtitle{Don't use vanilla \LaTeX{}  tables please}
+%	
+%		\begin{center}
+%			\begin{tabular}{@{}llr@{}}
+%				\toprule\multicolumn{2}{c}{Item} \\
+%				\cmidrule(r){1-2}Animal & Description & Price (\$)\\
+%				\midrule
+%				Gnat  & per gram  & 13.65 \\
+%				& each      & 0.01 \\
+%				Gnu   & stuffed   & 92.50 \\
+%				Emu   & stuffed   & 33.33 \\
+%				Armadillo & frozen & 8.99 \\
+%				\bottomrule
+%			\end{tabular}
+%		\end{center}
+%
+%\end{frame}
+%
+%\section{URLs and links}
+%
+%\begin{frame}{Clickable links}
+%
+%	Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
+%	Ut enim ad minim veniam, quis nostrud exercitation...
+%	
+%	\medskip
+%
+%	\url{http://control.ee.ethz.ch}
+%	
+%	\href{http://control.ee.ethz.ch}{Automatic Control Laboratory}
+%	
+%	\email{name@ethz.ch}
+%
+%\end{frame}
+%
+%\begin{closingframe}
+%
+%Professor John Doe\\
+%Role of person giving presentation\\
+%\email{beat.muster@abcd.ethz.ch}
+%
+%\medskip
+%
+%ETH Zurich\\
+%Organisational unit\\
+%Building Room\\
+%Street House number\\
+%0000 Town, Country\\
+%\url{http://www.abcd.ethz.ch}
+%
+%\end{closingframe}
+%
+%
+%\begin{closingframe}
+%
+%	You can edit the content of the \texttt{closingframe} environment to design your own closing frame. Example:
+%	
+%	\vspace{15mm}
+%
+%	\begin{columns}
+%		\begin{column}{0.55\textwidth}
+%			\raggedleft
+%			\includegraphics[width=45mm]{elements/IFA_logo_ENG_colours_horizontal} 
+%		\end{column}
+%		\begin{column}{0.45\textwidth}
+%			\textbf{Author name}\\
+%			\email{name@ethz.ch}	
+%		\end{column}
+%	\end{columns}
+%
+%	\vspace{20mm}
+%			
+%\end{closingframe}
+%
+%
+%\end{document}

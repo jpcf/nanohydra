@@ -1,16 +1,20 @@
 \documentclass[]{iisreport}
+\usepackage{tikz}
+\usepackage{ifthen}
+\usetikzlibrary{calc, patterns, angles, quotes, arrows, matrix, positioning, decorations.pathreplacing}
 
-\title{\LaTeX{} Report Template}
+\title{Energy-Efficient Edge Time-Series Classification}
 
 \author{Jose Pedro Castro Fonseca}
 \email{jcastro@student.ethz.ch}
 
-\semester{Fall Semester 2023}
+\semester{Spring Semester 2024}
 \date{16th of April 2024}
 \reporttype{DAS Thesis}
 
 \professor{Prof.\ Dr.\  Luca Benini, lbenini@iis.ee.ethz.ch}
-\advisor{Xiaying Wang, xia@iis.ee.ethz.ch}
+\advisor{Dr. Xiaying Wang, xia@iis.ee.ethz.ch}
+\advisor{Cristian Cioflan, ccioflan@iis.ee.ethz.ch}
 \advisor{Jannis Schoenleber, janniss@iis.ee.ethz.ch}
 
 \titlelogo{titlepage_logo}
@@ -30,27 +34,27 @@
 
 \input{src/introduction}
 \input{src/background}
-\input{src/related_work}
+%\input{src/related_work}
 \input{src/implementation}
 \input{src/results}
 \input{src/conclusion}
 
 \appendix
 
-\input{src/appendices/specific_guidelines}  % TODO: Remove these two appendices when you no longer need
-\input{src/appendices/latex_guide}          % their guidelines.
-\input{src/appendices/task_description}
+%\input{src/appendices/specific_guidelines}  % TODO: Remove these two appendices when you no longer need
+%\input{src/appendices/latex_guide}          % their guidelines.
+%\input{src/appendices/task_description}
 
 \backmatter
 
-\input{acr/main.tex}
-\input{acr/latex_and_writing.tex} % TODO: Remove this line when you no longer need the writing guidelines.
+%\input{acr/main.tex}
+%\input{acr/latex_and_writing.tex} % TODO: Remove this line when you no longer need the writing guidelines.
 \listofacronyms
 
 \listoffigures
 \listoftables
 
  % TODO: Remove the `latex_and_writing` bibliography when you no longer need that guide.
-\bibliography{./bib/main,./bib/latex_and_writing}
+\bibliography{./refs/bibliography.bib}
 
 \end{document}

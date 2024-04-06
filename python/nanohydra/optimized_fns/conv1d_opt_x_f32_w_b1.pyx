@@ -19,22 +19,23 @@ def conv1d_opt_x_f32_w_b1(cnp.ndarray[DTYPE_X_t, ndim=2] x, cnp.ndarray[DTYPE_W_
     cdef unsigned int num_examples = x.shape[0]
     cdef unsigned int xlen   = x.shape[1]
     cdef unsigned int wlen   = w.shape[2]
-    cdef unsigned int wlenD2 = int((w.shape[2]-1)/2)
     cdef unsigned int H = w.shape[0]
     cdef unsigned int K = w.shape[1]
-    cdef unsigned int xdil_len = int(xlen/(dilation+1))
+    cdef unsigned int xpad_len = (9//2)*(dilation+1)+1
 
-    cdef unsigned int h,k,xi,wi,xidx,ex
+    cdef unsigned int h,k,xi,wi,ex
 
-    cdef cnp.ndarray[DTYPE_X_t, ndim=4] Y = np.zeros([num_examples, H, K, xdil_len], dtype=DTYPE_X)
+    cdef cnp.ndarray[DTYPE_X_t, ndim=4] Y = np.zeros([num_examples, H, K, xlen], dtype=DTYPE_X)
+    cdef cnp.ndarray[DTYPE_X_t, ndim=2] x_dil = np.zeros([num_examples, xlen+xpad_len*2], dtype=DTYPE_X)
 
+    x_dil[:,xpad_len:xlen+xpad_len] = x[:,:]
+
+    # Work-sharing construct must start here, since np.take uses gil.
     with nogil:
         for ex in prange(num_examples, schedule='static', num_threads=24):
             for h in range(H):
                 for k in range(K):
-                    for xi in range(0, xlen, 1):
+                    for xi in range(xlen):
                         for wi in range(wlen):
-                            xidx = (1+dilation)*(xi+wi-wlenD2)
-                            if(xidx >= 0 and xidx < xlen):
-                                Y[ex, h, k, xi] += x[ex,xidx]*w[h,k,wi]
+                            Y[ex, h, k, xi] += x_dil[ex,xi+xpad_len+(wi-4)*(dilation+1)]*w[h,k,wi]
     return Y

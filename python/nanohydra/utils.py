@@ -93,6 +93,9 @@ def show_mfcc(X_mfcc, label, figid):
 def get_idx_of_class(Y, label):
     return np.argwhere(Y == label).flatten()
 
+def get_idx_of_notclass(Y, label):
+    return np.argwhere(Y != label).flatten()
+
 def augment_data_of_class(X, Xbackground, factor, add_noise=True):
     # Fixed params
     FS = 16000

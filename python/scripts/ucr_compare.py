@@ -7,7 +7,7 @@ import warnings
 import os
 import pickle
 
-CSV_PATH = "./data/results_ours_k8_g8.csv"
+CSV_PATH = "./data/results_ours.csv"
 UCR_DATA_SET_FACTS = "./data/ucr_props.bin"
 
 if __name__ == "__main__":
@@ -15,11 +15,11 @@ if __name__ == "__main__":
     csv = pd.read_csv(CSV_PATH)
 
     # Positive values means Hydra is better
-    diffs = 100*(csv['Hydra_Binomial'] - csv['Hydra'])
+    diffs = 100*(csv['Hydra_Quantized'] - csv['Hydra'])
 
     # Count Wins/Draws/Losses. Within -0.5pp is considered draw
     wins   = (np.greater_equal(diffs, 1) == True).sum()
-    draws  = (np.isclose(100*csv['Hydra_Binomial'], 100*csv['Hydra'], atol=0.5) == True).sum()
+    draws  = (np.isclose(100*csv['Hydra_Quantized'], 100*csv['Hydra'], atol=0.5) == True).sum()
     losses = (np.less(diffs, -1) == True).sum()
     total = wins+draws+losses
 
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.8)
 
     fig, ax = plt.subplots()
-    plt.title("Hydra Binomial (k=8, g=8) vs Hydra Gaussian. Positive means Binomial > Gaussian")
+    plt.title("Hydra Quantized (k=8, g=16) vs Original Results. Positive means Quantized > Original")
     plt.hist(diffs)
     plt.xlabel("Percent point difference")
     plt.ylabel("# Datasets")
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     # Write back results to another CSV. x
     csv_out = pd.DataFrame(csv['dataset'])
     csv_out['Hydra'] = csv['Hydra']
-    csv_out['Hydra_Binomial'] = csv['Hydra_Binomial']
+    csv_out['Hydra_Quantized'] = csv['Hydra_Quantized']
     csv_out['Differences'] = diffs
 
     # Print out the worse ones
