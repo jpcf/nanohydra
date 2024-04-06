@@ -13,8 +13,6 @@ int main(int argc, char *argv[]) {
     int16_t *inXptr;
     int8_t  *inPtr_8;
     int16_t *inPtr_16;
-    int ret;
-    FILE* fd;
 
     // Initialize Hydra model
     hydra = hydra_init(INPUT_LEN, WEIGH_LEN, NUM_K, NUM_G,
@@ -67,10 +65,6 @@ int main(int argc, char *argv[]) {
     if(fdo == -1)
         printf("Error opening output file: %d", errno);
     ftruncate(fdo, num_samples*(hydra->N_classes)*4);
-
-    if(ret < 0) {
-        printf("Error allocating file!\n");
-    }
 
     int32_t* outptr = (int32_t*) mmap(NULL, num_samples*(hydra->N_classes)*4, PROT_READ | PROT_WRITE, MAP_SHARED, fdo, 0); 
 

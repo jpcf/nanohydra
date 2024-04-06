@@ -10,7 +10,7 @@ from mlutils.quantizer import LayerQuantizer
 import pandas as pd
 
 DATASETS        = [
-    "InlineSkate"
+    "ECG5000"
 ]
 DO_QUANTIZE     = True
 DO_PLOT_QUANT   = False
@@ -26,7 +26,7 @@ def training_round(Xtrain, Xtest, Ytrain, Ytest, k=8, g=64, seed=None):
     input_length = Xtrain.shape[0]
     
     if(DO_QUANTIZE):                
-        lq_input = LayerQuantizer(Xtrain, 16)
+        lq_input = LayerQuantizer(Xtrain, 8)
         Xtrain = lq_input.quantize(Xtrain)
         Xtest  = lq_input.quantize(Xtest)
         print(f"Input Vector Quant.: {lq_input}")
@@ -35,7 +35,7 @@ def training_round(Xtrain, Xtest, Ytrain, Ytest, k=8, g=64, seed=None):
     if(accum_bits_shift < 0):
         accum_bits_shift = 0
     # Initialize the kernel transformer, scaler and classifier
-    model  = NanoHydra(input_length=input_length, num_channels=1, k=k, g=g, max_dilations=10, num_diffs=2, dist="binomial", classifier="Logistic", scaler="Sparse", seed=int(time.time()), dtype=np.int16, verbose=False)    
+    model  = NanoHydra(input_length=input_length, num_channels=1, k=k, g=g, max_dilations=10, num_diffs=2, dist="binomial", classifier="Logistic", scaler="Sparse", seed=int(time.time()), dtype=np.int8, verbose=False)    
 
     # Transform and scale
     print(f"Transforming {Xtrain.shape[0]} training examples...")

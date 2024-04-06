@@ -4,6 +4,15 @@ class LayerQuantizer():
 
     def __init__(self, layer_sample, desired_bw):
         
+        if(desired_bw == 16):
+            self.dtype = np.int16
+        elif(desired_bw == 8):
+            self.dtype = np.int8
+        else:
+            desired_bw = 16
+            self.dtype = np.int16
+            print(f"Warning: Setting bitwidth to 16-bits, as requested value is not possible")
+
         self.desired_bw = desired_bw
 
         self.Qm = None
@@ -40,7 +49,7 @@ class LayerQuantizer():
         return (self.Qn, self.Qm)
 
     def quantize(self, samples):
-        return np.round(samples * (2**self.Qn)).astype(np.int16)
+        return np.round(samples * (2**self.Qn)).astype(self.dtype)
 
     def dequantize(self, samples):
         return samples / (2**self.Qn)

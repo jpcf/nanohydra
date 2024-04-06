@@ -17,6 +17,7 @@ G=16
 MAX_DILATIONS = 3
 NUM_DIFFS     = 1
 DO_QUANTIZE   = True
+QUANT_BW      = 8
 
 DIST_FOLDER = "./dist/"
 SPLITS = ["train"] #"test"]
@@ -69,26 +70,26 @@ Ytest  = y['test'][ds]
 
 input_length = Xtrain.shape[2]
 
-lq_input = LayerQuantizer(Xtrain, 16)
+lq_input = LayerQuantizer(Xtrain, QUANT_BW)
 Xtrain = lq_input.quantize(Xtrain)
 Xtest  = lq_input.quantize(Xtest)
 print(f"Input Vector Quant.: {lq_input}")
 accum_bits_shift = lq_input.get_fract_bits()-1
 
 # Dump input vectors
-fp = np.memmap(f"dist/input_train.dat", dtype='int16', mode="w+", shape=(Xtrain.shape[0], Xtrain.shape[2]))
+fp = np.memmap(f"dist/input_train.dat", dtype=f'int{QUANT_BW}', mode="w+", shape=(Xtrain.shape[0], Xtrain.shape[2]))
 fp[:] = Xtrain[:,0,:]
 fp.flush()
 print(fp)
 del fp
-fp = np.memmap(f"dist/input_test.dat", dtype='int16', mode="w+", shape=(Xtest.shape[0], Xtest.shape[2]))
+fp = np.memmap(f"dist/input_test.dat", dtype=f'int{QUANT_BW}', mode="w+", shape=(Xtest.shape[0], Xtest.shape[2]))
 fp[:] = Xtest[:,0,:]
 fp.flush()
 print(fp)
 del fp
 
 # Initialize the kernel transformer, scaler and classifier
-model  = NanoHydra(input_length=input_length, num_channels=NUM_CHAN, k=K, g=G, max_dilations=MAX_DILATIONS, num_diffs=NUM_DIFFS, dist="binomial", classifier="Logistic", scaler="Sparse", seed=int(time.time()), dtype=np.int16, verbose=False)    
+model  = NanoHydra(input_length=input_length, num_channels=NUM_CHAN, k=K, g=G, max_dilations=MAX_DILATIONS, num_diffs=NUM_DIFFS, dist="binomial", classifier="Logistic", scaler="Sparse", seed=int(time.time()), dtype=np.int16 if QUANT_BW == 16 else np.int8, verbose=False)    
 
 # Transform and scale
 print(f"Transforming {Xtrain.shape[0]} training examples...")
@@ -106,7 +107,7 @@ Wq, bq =model.dump_classifier_weights()
 W = model.dump_weights()
 model.dump_defines("./include")
 
-fp = np.memmap(f"dist/weights.dat", dtype='int16', mode="w+", shape=(W.shape[0], W.shape[1]))
+fp = np.memmap(f"dist/weights.dat", dtype=f'int{QUANT_BW}', mode="w+", shape=(W.shape[0], W.shape[1]))
 fp[:] = W[:,:]
 fp.flush()
 del fp
@@ -148,8 +149,8 @@ for split in SPLITS:
     t_end= time.perf_counter()
 
     # Read the output feature vector produced by the C model
-    Yc = np.memmap(f"./dist/output.dat", dtype='int32', mode="r", shape=(len(Xt[split]), 5))
-    #Yc = np.memmap(f"./dist/output.dat", dtype='int32', mode="r", shape=(50, 5))
+    #Yc = np.memmap(f"./dist/output.dat", dtype='int32', mode="r", shape=(len(Xt[split]), 5))
+    Yc = np.memmap(f"./dist/output.dat", dtype='int32', mode="r", shape=(50, 5))
 
     nerr = check_rck_output(model.activ, Yc)
 
@@ -161,7 +162,7 @@ for split in SPLITS:
     else:
         Yground_truth = Ytrain.astype(np.uint8)-1
 
-    #acc = model.score_manual(Yc, Yground_truth[:50], method='prob')
-    acc = model.score_manual(Yc, Yground_truth, method='prob')
+    acc = model.score_manual(Yc, Yground_truth[:50], method='prob')
+    #acc = model.score_manual(Yc, Yground_truth, method='prob')
     print(f"Prediction accuracy for '{split}': {acc*100:.2f} %")
 

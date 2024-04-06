@@ -18,6 +18,7 @@ from   tensorflow.keras.losses    import SparseCategoricalCrossentropy
 
 from .optimized_fns.conv1d_opt_x_f32_w_f32        import conv1d_opt_x_f32_w_f32
 from .optimized_fns.conv1d_opt_x_int16_w_b1       import conv1d_opt_x_int16_w_b1
+from .optimized_fns.conv1d_opt_x_int8_w_b1        import conv1d_opt_x_int8_w_b1
 from .optimized_fns.combined_counting_opt         import combined_counting_opt
 
 # Adding Hydra Model Path
@@ -244,6 +245,8 @@ class NanoHydra():
                     # Perform convolution on all kernels of a given dilation
                     if(self.dtype == np.int16):
                         _Z = conv1d_opt_x_int16_w_b1(_X, self.W, dilation = d)
+                    elif(self.dtype == np.int8):
+                        _Z = conv1d_opt_x_int8_w_b1(_X, self.W, dilation = d)
                     else:
                         _Z = conv1d_opt_x_f32_w_f32(_X, self.W, dilation = d)
 

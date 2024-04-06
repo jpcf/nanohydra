@@ -6,6 +6,7 @@
     #define MALLOC pi_l2_malloc
 #endif
 
+
 Hydra* hydra_init(
     uint16_t   lenX,
     uint16_t   lenW,
@@ -40,22 +41,22 @@ Hydra* hydra_init(
     hydra->len_feat_vec = hydra->H*hydra->K*hydra->N_dil*hydra->N_diff*hydra->N_feats*hydra->N_chan;
 
     // Allocate input vector
-    hydra->inX      = (int16_t**) MALLOC(sizeof(int16_t*)*hydra->N_chan);
-    hydra->inX_diff = (int16_t**) MALLOC(sizeof(int16_t*)*hydra->N_chan);
+    hydra->inX      = (RCKINT**) MALLOC(sizeof(RCKINT*)*hydra->N_chan);
+    hydra->inX_diff = (RCKINT**) MALLOC(sizeof(RCKINT*)*hydra->N_chan);
 
     for(int c=0; c < hydra->N_chan; c++) {
-        hydra->inX[c]      = (int16_t*) MALLOC(sizeof(int16_t)*(hydra->lenX + 2*hydra->lenXpad+1));
-        hydra->inX_diff[c] = (int16_t*) MALLOC(sizeof(int16_t)*(hydra->lenX + 2*hydra->lenXpad+1));
+        hydra->inX[c]      = (RCKINT*) MALLOC(sizeof(RCKINT)*(hydra->lenX + 2*hydra->lenXpad+1));
+        hydra->inX_diff[c] = (RCKINT*) MALLOC(sizeof(RCKINT)*(hydra->lenX + 2*hydra->lenXpad+1));
 
         // Initialize to zeros input vector
         for(int i=0; i <= hydra->lenX + 2*hydra->lenXpad; i++) {
-            hydra->inX[c][i]      = (int16_t) (0);
-            hydra->inX_diff[c][i] = (int16_t) (0);
+            hydra->inX[c][i]      = (RCKINT) (0);
+            hydra->inX_diff[c][i] = (RCKINT) (0);
         }
     }    
 
     // Allocate weight vector
-    hydra->inW = (int16_t*) MALLOC(sizeof(int16_t)*hydra->H*hydra->K*(hydra->lenW));
+    hydra->inW = (RCKINT*) MALLOC(sizeof(RCKINT)*hydra->H*hydra->K*(hydra->lenW));
 
     // Allocate feature vector
     hydra->featVec = (int16_t*) MALLOC(sizeof(int16_t) * hydra->len_feat_vec); 

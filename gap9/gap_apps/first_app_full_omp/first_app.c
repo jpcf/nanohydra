@@ -13,8 +13,8 @@
 #define BUFFER_SZ   1200
 
 #ifdef PARALLELIZE
-static PI_L1 int16_t inX[BUFFER_SZ], inX_diff[BUFFER_SZ], featVec[2*BUFFER_SZ];
-static PI_L1 int16_t  inW[BUFFER_SZ];
+static PI_L1 RCKINT  inX[BUFFER_SZ], inX_diff[BUFFER_SZ], inW[BUFFER_SZ];
+static PI_L1 int16_t featVec[2*BUFFER_SZ];
 
 void hydra_forward_gap9(void *args) {
     
@@ -29,14 +29,14 @@ void hydra_forward_gap9(void *args) {
     pi_cl_dma_copy_t copy_L2_to_L1_inX, copy_L2_to_L1_inX_diff, copy_L2_to_L1_inW;
     copy_L2_to_L1_inX.dir   = PI_CL_DMA_DIR_EXT2LOC;
     copy_L2_to_L1_inX.merge = 0;
-    copy_L2_to_L1_inX.size  = (uint16_t) hydra->lenX*2;
+    copy_L2_to_L1_inX.size  = (uint16_t) hydra->lenX*sizeof(RCKINT);
     copy_L2_to_L1_inX.id    = 0;
     copy_L2_to_L1_inX.ext   = (uint32_t) &(hydra->inX[0][hydra->lenXpad]);
     copy_L2_to_L1_inX.loc   = (uint32_t) &(inX[hydra->lenXpad]);
 
     copy_L2_to_L1_inX_diff.dir   = PI_CL_DMA_DIR_EXT2LOC;
     copy_L2_to_L1_inX_diff.merge = 0;
-    copy_L2_to_L1_inX_diff.size  = (uint16_t) 2*(hydra->lenX-1);
+    copy_L2_to_L1_inX_diff.size  = (uint16_t) (hydra->lenX-1)*sizeof(RCKINT);
     copy_L2_to_L1_inX_diff.id    = 1;
     copy_L2_to_L1_inX_diff.ext   = (uint32_t) &(hydra->inX_diff[0][hydra->lenXpad]);
     copy_L2_to_L1_inX_diff.loc   = (uint32_t) &(inX_diff[hydra->lenXpad]);
@@ -288,8 +288,14 @@ int main()
     for(int s=0; s < NUM_SAMPLES; s++) {
         /************* SECTION 4a: Reading the input data into mem *************/
         for(int i = 0; i < INPUT_LEN; i++) {
-            pi_fs_read(fd[0], flash_buffer, 2);
-            hydra->inX[0][i+hydra->lenXpad] = (flash_buffer[1] << 8 | flash_buffer[0]);
+            if(sizeof(RCKINT) == 2) {
+                pi_fs_read(fd[0], flash_buffer, 2);
+                hydra->inX[0][i+hydra->lenXpad] = (flash_buffer[1] << 8 | flash_buffer[0]);
+            }
+            else {
+                pi_fs_read(fd[0], flash_buffer, 1);
+                hydra->inX[0][i+hydra->lenXpad] = flash_buffer[0];
+            }
             //printf("Read from file @[%d]: %d\n", i, hydra->inX[0][i]);
         }
         for (int xi=0; xi < hydra->lenX-1; xi++) {

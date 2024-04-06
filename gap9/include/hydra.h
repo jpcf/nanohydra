@@ -11,11 +11,17 @@
 
 #include "hydra_defines.h"
 
+#ifdef QUANT_8BIT
+    #define RCKINT int8_t
+#else
+    #define RCKINT int16_t
+#endif
+
 typedef struct Hydra {
     // Memory allocations
-    int16_t   **inX;
-    int16_t   **inX_diff;
-    int16_t     *inW;
+    RCKINT   **inX;
+    RCKINT   **inX_diff;
+    RCKINT     *inW;
     int16_t    *featVec;
     int8_t   **classf_weights;
     int8_t    *classf_bias;
@@ -46,8 +52,8 @@ typedef struct Hydra {
 
 #ifdef TARGET_GAP9
 typedef struct {
-    int16_t * inX;
-    int16_t  * inW;
+    RCKINT  * inX;
+    RCKINT  * inW;
     int16_t * featVec;
     uint8_t  dil;
     Hydra*   hydra;
@@ -74,9 +80,9 @@ void hydra_reset(Hydra *hydra);
 #if defined (TARGET_GAP9) && defined (PARALLELIZE)
 void hydra_convolve(void* args);
 #else
-void hydra_convolve(int16_t   *inX, 
-                    int16_t    *inW, 
-                    int16_t   *featVec, 
+void hydra_convolve(RCKINT   *inX, 
+                    RCKINT   *inW, 
+                    int16_t  *featVec, 
                     uint16_t   dil,
                     Hydra     *hydra,
                     uint8_t    diff_idx
