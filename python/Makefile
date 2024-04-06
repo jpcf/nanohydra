@@ -27,10 +27,10 @@ test:
 	$(PYTHONPATH) test.py 10000
 
 test_quant: 
-	$(PYTHONPATH) test_quant.py 10000
+	$(PYTHONPATH) test_quant.py all
 
 run_ucr_benchmark: 
-	$(PYTHONPATH) run_ucr_benchmark.py ECG5000
+	$(PYTHONPATH) run_ucr_benchmark.py all
 
 analyze_ucr_benchmark: 
 	$(PYTHONPATH) scripts/ucr_compare.py
@@ -54,3 +54,6 @@ test_scaler:
 
 test_data_aug:
 	$(PYTHONPATH) test_data_aug.py
+
+tmse:
+	$(PYTHONPATH) tmse.py

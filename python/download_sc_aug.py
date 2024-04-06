@@ -16,11 +16,12 @@ NUM_CLASSES         = 12
 NUM_SAMPLES_SCALING = 4000
 NUM_SAMPLES_UNKNOWN = 20000
 NUM_MFCC_CHANS      = 8
+NUM_DIFFS           = 2
 K=8
 G=32
 D=1
-FEATURE_VEC_SZ      = 2*K*G*(D+1)*NUM_MFCC_CHANS
-#FEATURE_VEC_SZ      = K*G*(D+1)*NUM_MFCC_CHANS
+FEATURE_VEC_SZ      = NUM_DIFFS*K*int(G/2)*(D+1)*NUM_MFCC_CHANS
+
 (Xtrain, Ytrain), (Xtest, Ytest), (Xval, Yval) = tfds.as_numpy(tfds.load('speech_commands', split=['train', 'test', 'validation'], batch_size=-1, as_supervised=True))
 
 print(f"Shape of Xtrain: {Xtrain.shape}")
@@ -67,7 +68,8 @@ for cl in range(NUM_CLASSES):
         X = np.concatenate([Xraw, Xaug])
     else:
         print(f"Subsample Class {cl} 'Unknown' (Size={len(Xraw)}, New Size={NUM_SAMPLES_UNKNOWN})")
-        X = Xraw[np.random.choice(len(Xraw), NUM_SAMPLES_UNKNOWN, replace=False),:]
+        #X = Xraw[np.random.choice(len(Xraw), NUM_SAMPLES_UNKNOWN, replace=False),:]
+        X = Xraw
         Xaug   = augment_data_of_class(X, Xbackground, factors[cl], add_noise=factors[cl]!=CLASS_SILENCE)
         X = np.concatenate([X, Xaug])
         print(f"Shape = {X.shape}")
@@ -77,10 +79,10 @@ for cl in range(NUM_CLASSES):
 
     if(cl == 0):
         # Model instantiation, only used to perform the transforms
-        model  = NanoHydra(input_length=Xmfcc.shape[2], num_channels=NUM_MFCC_CHANS, k=K, g=G, max_dilations=D, dist="binomial", classifier="Logistic", scaler="Sparse", seed=19930111, dtype=np.float32)    
+        model  = NanoHydra(input_length=Xmfcc.shape[2], num_channels=NUM_MFCC_CHANS, k=K, g=G, num_diffs=NUM_DIFFS, max_dilations=D, dist="binomial", classifier="Logistic", scaler="Sparse", seed=19930111, dtype=np.float32)    
 
     print(f"Hydra-Transforming Class {cl}...")
-    Xtr  = model.forward_batch(Xmfcc.astype(np.float32), 200, do_fit=False, do_scale=False)
+    Xtr  = model.forward_batch(Xmfcc.astype(np.float32), 200, do_fit=False, do_scale=False, frac_bit_shift=0)
 
     print(Xtr.shape)
     assert Xtr.shape[1] == FEATURE_VEC_SZ, f"The feature vector has unexpected size={Xtr.shape[1]}, expected {FEATURE_VEC_SZ}"
@@ -111,7 +113,7 @@ gc.collect()
 # Transform and Scale Test Set
 print(f"Transforming Test Set")
 Xmfcc = transform_mfcc(Xtest)
-Xtr = model.forward_batch(Xmfcc.astype(np.float32), 200, do_fit=False, do_scale=False)
+Xtr = model.forward_batch(Xmfcc.astype(np.float32), 200, do_fit=False, do_scale=False, frac_bit_shift=0)
 Xsc = scaler.transform(Xtr)
 model.save_transform(Xsc, f"SpeechCommands_300", "./work", "test")
 del Xtest
@@ -120,7 +122,7 @@ gc.collect()
 # Transforma and Scale Validation Set
 print(f"Transforming Validation Set")
 Xmfcc = transform_mfcc(Xval)
-Xtr = model.forward_batch(Xmfcc.astype(np.float32), 200, do_fit=False, do_scale=False)
+Xtr = model.forward_batch(Xmfcc.astype(np.float32), 200, do_fit=False, do_scale=False, frac_bit_shift=0)
 Xsc = scaler.transform(Xtr)
 model.save_transform(Xsc, f"SpeechCommands_300", "./work", "val")
 del Xval

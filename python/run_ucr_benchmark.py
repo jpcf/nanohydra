@@ -17,7 +17,7 @@ def training_round(Xtrain, Xtest, Ytrain, Ytest, k=8, g=64, seed=None):
     input_length = Xtrain.shape[2]
 
     # Initialize Model 
-    model  = NanoHydra(input_length=input_length, k=k,g=g, max_dilations=10, dist="binomial", classifier="Logistic", seed=seed, scaler="Sparse", dtype=np.float32, verbose=False)    
+    model  = NanoHydra(input_length=input_length, k=k,g=g, max_dilations=10, dist="binomial", classifier="Logistic", seed=seed, scaler="Sparse", dtype=np.int16, verbose=False)    
 
     # Perform Transform on Training Values
     Xt  = model.forward_batch(Xtrain, 500, do_fit=True, do_scale=True)
@@ -69,7 +69,7 @@ if __name__ == "__main__":
 
                 start = time.perf_counter()
                 
-                score = training_round(Xtrain, Xtest, Ytrain, Ytest, 8, 8, seed=i)
+                score = training_round(Xtrain, Xtest, Ytrain, Ytest, 8, 16, seed=i)
                 print(f"Score for '{ds}': {100*score:0.02f} %") 	
 
                 scores.append(score)

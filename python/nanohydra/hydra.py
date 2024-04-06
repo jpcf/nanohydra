@@ -162,18 +162,20 @@ class NanoHydra():
 
         # Size of transform
         # Note that 1kB = 2**10 bytes
+        feat_vec_bytes = 2
+        len_feat_vec = self.num_channels * self.h * self.k * self.num_dilations * self.num_diffs * 2
         self.size['transform']              = self.W.size * bits_per_w / 8 / (2**10)
-        self.size['feature_vec']            = self.W.size / self.__KERNEL_LEN
-        self.complexity_mmacs['transform']  = self.input_length * self.W.size / 1e6
+        self.size['feature_vec']            = len_feat_vec * feat_vec_bytes / (2**10)
+        self.complexity_mmacs['transform']  = self.input_length * self.num_channels * self.h * self.k * self.num_dilations * self.num_diffs * self.__KERNEL_LEN / 1e6
 
         # Size of classifier. Assumer weights will be quantized to 8bits
-        self.size['classifier']             = self.size['feature_vec'] / (2**10)
-        self.complexity_mmacs['classifier'] = self.size['feature_vec'] / 1e6
+        self.size['classifier']             = len_feat_vec * 12 / (2**10)
+        self.complexity_mmacs['classifier'] = len_feat_vec * 12 / 1e6
         #self.size['classifier']             = self.cfg.get_classf().coef_.size / (2**10)
         #self.complexity_mmacs['classifier'] = self.cfg.get_classf().coef_.size
 
         # Total size (in Flash memory)
-        self.size['total']             = self.size['transform'] + self.size['classifier']
+        self.size['total']             = self.size['transform'] + self.size['classifier'] + self.size['feature_vec']
         self.complexity_mmacs['total'] = self.complexity_mmacs['transform'] + self.complexity_mmacs['classifier']
 
     def fit_scaler(self, X, num_samples=None):
@@ -362,8 +364,10 @@ class NanoHydra():
         self.activ
         """
         self.activ = (np.dot(self.Wq, X.T).T + self.bq)
-        pred = np.argmax(self.activ, axis=1).astype(np.uint8)+1
-        self.activ
+        if(self.Wq.shape[0] == 1):
+            pred = np.where(self.activ < 0, 0, 1).flatten() 
+        else:
+            pred = np.argmax(self.activ, axis=1).astype(np.uint8)
         return pred
 
     def fit_tf_classifier(self, X, Y, X_val, Y_val):
@@ -442,7 +446,7 @@ class SparseScaler():
 
     def quantize(self):
         self.muq    = self.mu.astype(np.int16)
-        self.sigmaq = np.ceil(np.log2(self.sigma)).astype(np.uint16)
+        self.sigmaq = np.floor(np.log2((np.clip(self.sigma, a_min=1, a_max=None)))).astype(np.uint16)
 
     def transform_quant(self, X):
 

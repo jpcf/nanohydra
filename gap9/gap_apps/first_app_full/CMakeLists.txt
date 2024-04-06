@@ -87,6 +87,8 @@ add_compile_definitions(FILE_INPUT_CLASSF_W=${FILENAME_INPUT_CLASSF_W})
 
 # Pre-compiler switches to enable GAP9-port specific funcionalities
 add_compile_definitions(TARGET_GAP9=1)
+add_compile_definitions(VECTORIZE=1)
+#add_compile_definitions(PARALLELIZE=1)
 
 # Add file to the readfs filesystem
 readfs_add_files(FILES ${FILE_INPUT_DATA} ${FILE_INPUT_WEIGHTS} ${FILE_INPUT_SS_MEANS} ${FILE_INPUT_SS_STDS} ${FILE_INPUT_CLASSF_W} ${FILE_INPUT_CLASSF_B} FLASH mram PARTITION readfs_app)
