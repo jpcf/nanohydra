@@ -14,7 +14,7 @@ void hydra_convolve(void *args) {
 #else
 void hydra_convolve(RCKINT *inX, RCKINT *inW, int16_t *featVec, uint16_t dil, Hydra* hydra, uint8_t curr_diff) {
 #endif
-    uint16_t   h,k;
+    uint16_t  h,k;
     uint16_t  xi;
     int32_t   conv_out[8] = {0};
     uint16_t  argmax=0, argmin=0;
@@ -38,8 +38,8 @@ void hydra_convolve(RCKINT *inX, RCKINT *inW, int16_t *featVec, uint16_t dil, Hy
     #endif
 
     // OMP for target x64
-    //omp_set_num_threads(8);
-    //#pragma omp parallel for private(h, k, xi, featVecPtr, featVecTmpMax, featVecTmpMin, inXptr, inWptr, min, max, conv_out) firstprivate(dil, curr_diff, argmin, argmax) shared(featVec, inX, inW, hydra)
+    //omp_set_num_threads(24);
+    //#pragma omp parallel for private(h, k, xi, featVecPtr, featVecTmpMax, featVecTmpMin, inXptr, inWptr, conv_out) firstprivate(dil, curr_diff, argmin, argmax) shared(featVec, inX, inW, hydra)
     for(h=0; h < hydra->H; h++) {
         #if defined (TARGET_GAP9) && defined (PARALLELIZE)
         if(h == pi_core_id()) {
@@ -48,7 +48,6 @@ void hydra_convolve(RCKINT *inX, RCKINT *inW, int16_t *featVec, uint16_t dil, Hy
         featVecPtr = &(featVec[h*hydra->K*hydra->N_feats]);
         inXptr     = &inX[hydra->lenXpad-4*dil-4];
 
-        //printf("featVectPtr addr=%p, core %d, chunk %d\n", featVec, pi_core_id(), h);
         for(k=0; k < hydra->K; k++) {
             #ifdef TARGET_GAP9
             #ifdef VECTORIZE

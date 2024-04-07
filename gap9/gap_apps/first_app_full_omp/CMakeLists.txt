@@ -64,7 +64,7 @@ endif()
 ###############################################################################
 
 # get proper file path
-set(FILENAME_INPUT_DATA        input_train.dat)
+set(FILENAME_INPUT_DATA        input_test.dat)
 set(FILENAME_INPUT_WEIGHTS     weights.dat)
 set(FILENAME_INPUT_SS_MEANS    means.dat)
 set(FILENAME_INPUT_SS_STDS     stds.dat)

@@ -20,7 +20,7 @@ DO_QUANTIZE   = True
 QUANT_BW      = 8
 
 DIST_FOLDER = "./dist/"
-SPLITS = ["train"] #"test"]
+SPLITS = ["test"]
 RUN_ON_TARGET_GAP9 = True
 
 def check_rck_output(Y, Yc):
@@ -134,9 +134,6 @@ fp[:] = bq[:]
 fp.flush()
 del fp
 
-# Compile C model with generated .h file defines
-os.system(f"make model_equivalence_check")
-
 # Run C model, which will dump the output feature vector 
 for split in SPLITS:
     model.predict_quantized(Xt[split])
@@ -145,6 +142,8 @@ for split in SPLITS:
     if(RUN_ON_TARGET_GAP9):
         os.system(f"cd ./gap_apps/first_app_full_omp && cmake --build build --target run && cp build/output.dat ../../dist && cd ../..")
     else:
+        # Compile C model with generated .h file defines
+        os.system(f"make model_equivalence_check")
         os.system(f"./dist/model_equivalence_check ./dist/input_{split}.dat {len(Xt[split])}")
     t_end= time.perf_counter()
 
@@ -162,7 +161,7 @@ for split in SPLITS:
     else:
         Yground_truth = Ytrain.astype(np.uint8)-1
 
-    acc = model.score_manual(Yc, Yground_truth[:50], method='prob')
     #acc = model.score_manual(Yc, Yground_truth, method='prob')
+    acc = model.score_manual(Yc, Yground_truth[:50], method='prob')
     print(f"Prediction accuracy for '{split}': {acc*100:.2f} %")
 

@@ -41,6 +41,10 @@ ifdef PARALLELIZE
 CFLAGS+=-DPARALLELIZE=$(PARALLELIZE)
 endif
 
+ifdef QUANT_8BIT
+CFLAGS+=-DQUANT_8BIT=$(QUANT_8BIT)
+endif
+
 run_forward_equiv_test: forward_equivalence_check
 	$(PYTHONPATH) test/forward_equivalence_check.py
 

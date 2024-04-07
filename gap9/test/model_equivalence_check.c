@@ -9,8 +9,9 @@
 #include "../include/hydra_defines.h"
 
 int main(int argc, char *argv[]) {
-    Hydra *hydra;
-    int16_t *inXptr;
+    Hydra   *hydra;
+    RCKINT  *inXptr;
+    RCKINT  *inWptr;
     int8_t  *inPtr_8;
     int16_t *inPtr_16;
 
@@ -27,15 +28,15 @@ int main(int argc, char *argv[]) {
 
     if(fdi == -1)
         printf("Error opening input file");
-    inXptr = (int16_t*) mmap(NULL, num_samples*(hydra->lenX+hydra->lenXpad*2+1)*2, PROT_READ, MAP_SHARED, fdi, 0);
+    inXptr = (RCKINT*) mmap(NULL, num_samples*(hydra->lenX+hydra->lenXpad*2+1)*sizeof(RCKINT), PROT_READ, MAP_SHARED, fdi, 0);
 
     if(inXptr == MAP_FAILED)
         printf("MMAP Failed!\n");
 
     // Read weights
     fdi = open("./dist/weights.dat", O_RDONLY);
-    inPtr_8 = (int8_t*) mmap(NULL, hydra->H*hydra->K*hydra->lenW, PROT_READ, MAP_SHARED, fdi, 0);
-    memcpy(hydra->inW, inPtr_8, hydra->lenW*hydra->K*hydra->H);
+    inWptr = (RCKINT*) mmap(NULL, hydra->H*hydra->K*hydra->lenW*sizeof(RCKINT), PROT_READ, MAP_SHARED, fdi, 0);
+    memcpy(hydra->inW, inWptr, hydra->lenW*hydra->K*hydra->H*sizeof(RCKINT));
 
     // Read scaler means 
     fdi = open("./dist/means.dat", O_RDONLY);
@@ -64,9 +65,9 @@ int main(int argc, char *argv[]) {
     int fdo = open("./dist/output.dat", O_RDWR | O_CREAT, (mode_t)0600);
     if(fdo == -1)
         printf("Error opening output file: %d", errno);
-    ftruncate(fdo, num_samples*(hydra->N_classes)*4);
+    ftruncate(fdo, num_samples*(hydra->N_classes)*sizeof(int32_t));
 
-    int32_t* outptr = (int32_t*) mmap(NULL, num_samples*(hydra->N_classes)*4, PROT_READ | PROT_WRITE, MAP_SHARED, fdo, 0); 
+    int32_t* outptr = (int32_t*) mmap(NULL, num_samples*(hydra->N_classes)*sizeof(int32_t), PROT_READ | PROT_WRITE, MAP_SHARED, fdo, 0); 
 
     if(outptr == MAP_FAILED)
         printf("MMAP Failed: %d\n", errno);
@@ -76,7 +77,7 @@ int main(int argc, char *argv[]) {
         hydra_reset(hydra); 
         // Generate Difference Vector
         for (int chan = 0; chan < hydra->N_chan; chan++) {
-            memcpy(&hydra->inX[0][hydra->lenXpad], &inXptr[i*hydra->lenX], hydra->lenX*2);
+            memcpy(&hydra->inX[0][hydra->lenXpad], &inXptr[i*hydra->lenX], hydra->lenX*sizeof(RCKINT));
 
             for (int xi=0; xi < hydra->lenX-1; xi++) {
                 hydra->inX_diff[chan][xi+hydra->lenXpad] = hydra->inX[chan][xi+1+hydra->lenXpad]-hydra->inX[chan][xi+hydra->lenXpad];
@@ -95,7 +96,7 @@ int main(int argc, char *argv[]) {
         outptr[i*hydra->N_classes + 4] = hydra->classf_scores[4];
     }
 
-    msync(outptr, num_samples*(hydra->N_classes)*4, MS_SYNC);
+    msync(outptr, num_samples*(hydra->N_classes)*sizeof(int32_t), MS_SYNC);
     close(fdo);
     close(fdi);
 
