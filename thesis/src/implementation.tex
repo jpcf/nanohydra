@@ -142,11 +142,11 @@
     we can further speed-up the training and inference by using Cython\footnote{\href{https://cython.org/}{https://cython.org/}}. This library allows the programmer to write certain performance-critical functions
     in a python dialect that can be translated to C, and compiled to machine code before run-time. Depending on the skill of the programmer it can completely bypass the Python Interpreter and be run directly in machine code.
     This is especially useful since the Python Interpreter Lock (PIL) prevents multicore execution of Python code (one needs to resort to the \verb|multiprocessing|\footnote{\href{https://docs.python.org/3/library/multiprocessing.html}{https://docs.python.org/3/library/multiprocessing.html}} library, and use process
-    based parallelism), but by using Cython we can add \textbf{OpenMP}\footnote{\href{https://www.openmp.org/}{https://www.openmp.org/}} \textbf{directives} that are appended to the sections of the Cython function that exclusively use C, and therefore are outside the (PIL). This results
+    based parallelism), but by using Cython we can add \textbf{OpenMP}\footnote{\href{https://www.openmp.org/}{https://www.openmp.org/}} \textbf{directives} that are appended to the sections of the Cython function that exclusively use C, and therefore are outside the PIL. This results
     in easy multicore parallelization gains, as we would have when using C+OpenMP, while still having the expressiveness and productivity of a Python environment. Lastly, it should be noted that the rationale for using Cython when the original
     formulation used torch is that of greater flexibility of trying new ideas in a language that closely resembled the target embedded deployment, which would be in C.
 
-    \subsubsection{C implementation}
+    \subsubsection{C implementation}\label{sec:im_cim}
     The algorithm implemented in the aforementioned Python model was then ported to C, with the end goal of deploying it in an embedded system. 
     However, since we must guarantee that the C implementation is equivalent to our Python model, the C implementation is first done in a platform-agnostic way,
     such that it can be run on a PC, and quickly run across an entire dataset, check its output is equivalent bit-by-bit to the output of the Python model. With this approach, 
@@ -166,6 +166,8 @@
         \verb|PARALLELIZE| & When defined, enables parallelization of the RCK computations. \\
         \hline
         \verb|VECTORIZE|   & When defined, enables vectorization across all computation stages of the algorithm. \\
+        \hline
+        \verb|QUANT_8BIT|  & When defined, uses 4-way SIMD vectorization (8-bit operands) on the RCK computations. When not, SIMD defaults to 2-way (16-bit operands). \\
         \hline
     \end{tabular}
     \caption{Compilation Switches}
@@ -198,22 +200,102 @@
     \label{tbl:library_c}
     \end{table}
 
-    \subsection{Embedded Implementation}\label{sec:im_nanohydra_embimp}
+    \section{Embedded Implementation}\label{sec:im_nanohydra_embimp}
 
-        \subsubsection{General Optimizations}\label{sec:im_nanohydra_embimp_genopt}
+        In terms of the GAP9 port of the C model of NanoHydra outlined in Section \ref{sec:im_cim}, some aspects are notable of mention. The general methodology was to first perform
+        as many general optimizations as possible on the C port, before performing GAP9-specific optimizations, since these general optimizations will also optimize the GAP9 port, but
+        are easier to debug and validate, since they are run on the development PC. However, the structure of the C port, although initially generic, was thought out with the future GAP9 Architecture outlined in Section \ref{sec:im_nanohydra_embimp_genopt} in mind.
+        In that section, we will explain the generic optimizations as well.
 
-        % Weights copied to L1 Memory
+        The GAP9-specific optimizations were the use of \textbf{Vectorization} and \textbf{Parallelization}, whose implementation will be explained in Sections \ref{sec:im_nanohydra_embimp_vect} and \ref{sec:im_nanohydra_embimp_paral}, respectively.
 
-        \subsubsection{Vectorization}\label{sec:im_nanohydra_embimp_vect}
+        \subsection{General Architecture}\label{sec:im_nanohydra_embimp_genopt}
 
-        % Table with vectorization of each stage |stage|SIMD|rationale
+        \subsubsection{C Optimizations}
+        As referenced before, Step 1 of algorithm produces a feature vector, which is a result of the concatenation of the RCK passes through dilated and differentiated versions of the input time series. It was chosen to linearize
+        the feature vector instead of using a multidimensional array for each group, dilation and differentiation level, since this would require several levels of pointer dereferencing. Furthermore, since the features are concatenatated in 
+        a consistent fashion, we can slice the portion of the feature vector that each group of kernels is working on, get a pointer to each of those locations, and avoid repeating the pointer arithmetic computations on every access. This resulted
+        in performance gains of up to 20\%.
+
+        \subsubsection{Usage of the GAP9 Compute Cluster}\label{sec:im_nanohydra_usage_cc}
+        Using the GAP9 CC comes with great potential execution time gains, due to the possibility of parallelizing a work load over 8 cores. However, the CC should be switched off after the parallel computation finishes, since
+        its chip power domain consumes extra power; and whenever it is powered down, the L1 RAM contents are lost, since they are volatile. This means that for every power cycle there is considerable memory traffic from the shared L2 RAM into
+        the L1 RAM of the CC (on which CC has lower access latency), which is coordinated and streamlined by the DMA block.
+
+        Therefore, the decision of using the CC is a balance between:        
+        \begin{itemize}
+            \item Execution time gains one gets when using it.
+            \item Additional memory traffic overhead of operands, parameters and results (Copy-In for operands and parameters, Copy-Out for results) at the DMA.
+            \item Additional power required by using the CC, versus keeping computations in the FC.
+        \end{itemize}
+        Execution time gains on the CC can be offset by DMA traffic, if the parallelizable section is too short, but the volume of operands is very high. Furthermore, 
+        blind execution time optimization can degrade energy-efficiency -- if upper bounds requirements on the execution time are defined, then we only need to use the CC if the computation time is too long and violates these requirements; if it does not, 
+        further optimizing execution time makes no sense, since we increase power consumption on a design that already satisfies requirements.
+
+        With these considerations in mind, we can then justify if the usage of the CC is desirable for each of the three computation stages of NanoHydra. Using the
+        memory and computational requirements listed in Tables \ref{tbl:gap9_test_cfg_reqmem} and \ref{tbl:gap9_test_cfg_reqmem}, respectively, we can generate
+        another table, Table \ref{tbl:im_nanohydra_rel_eff}, with the relative memory and computational effort over the total forward inference pass.
+
+        \begin{table}[h!]
+            \centerfloat
+            \rowcolors{2}{lightgray}{white}
+            \begin{tabular}{ c c c c c}
+            \toprule
+            \textbf{Configuration Name} & Computation & Memory & Computation & Memory \\
+            \midrule
+            CFGA & 99.78 \% &  1.83 \%  &  0.22 \% & 98.17 \% \\
+            CFGB & 99.78 \% &  0.56 \%  &  0.22 \% & 99.44 \% \\
+            \bottomrule
+            \end{tabular}
+            \caption{Computational and memory relative effort comparison.}%
+            \label{tbl:im_nanohydra_rel_eff}
+        \end{table}
+
+        An interesting 99\% vs. 1\% pattern emerges: Step 1 does 99\% of the computational effort, but requires only 1\% of the total memory requirements, while Step 2 displays the complete opposite characteristics! We see then
+        that parallelization greatly benefits Step 1, since most of the computational effort is done at this stage, and to make matters even better, the memory traffic is only around 1 \% of the total, which makes any DMA
+        traffic overhead insignificant. However, Steps 2 and 3 only represent 1 \% of the computational effort, but the memory traffic that would be generated would be 100x greater than Step 1. Therefore, not only the parallelization
+        gains would benefit only 1 \% of the computational effort, we would incur in a large amount of DMA overhead which would effectively cancel any parallelization computation speed up (given the extreme imbalance, it would most certainly worsen it).
+
+        The reason for this imbalance is that in Step 1, the RCKs are intensive and repetitive operations done on dilated and differentiated versions of the input time series with a small set of fixed parameters, while Steps 2 and 3 are dominated by 
+        matrix-vector products, where the matrices are the trained coefficients of the Logistic Regression classifier.
+
+        \subsection{Vectorization}\label{sec:im_nanohydra_embimp_vect}
+
+        Regardless of the relative computational effort, vectorization can always improve the execution speed. 
+        The actual benefit depends more on the types of computations that each stage performs, and if the operands are already packed in memory (if they are not, we need to pack them before executing the SIMD instruction).
+
+        Vectorization is accomplished by making use of the GAP9 built-in intrinsics that map to SIMD instructions. The instructions used were:
+
+        \begin{itemize}
+            \item \textbf{Packing}     -- \verb|__builtin_pulp_pack2| and \verb|__builtin_pulp_pack4| for packing 16-bit and 8-bit operands, respectively, that are not aligned in memory.
+            \item \textbf{Dot Product} -- \verb|__builtin_pulp_sdotsp2| and \verb|__builtin_pulp_sdotsp4| for performing 2-way and 4-way SIMD, using 16-bit or 8-bit operands, respectively. 
+                                          The accumulation scalar variable is one of the arguments of the functions, and the updated value is returned.
+        \end{itemize}
+
+        Regarding Step 1, one of the main operation is the convolution, portrayed in Equation \ref{eq:dil_cnn_eq}, which can be seen as a \emph{dot product} between the kernel
+        weights, and a window of the input time series (whose samples can have dilation or not). This dot product, whose length is fixed at 9 samples, can be either vectorized as 
+        \textbf{two} 4-way SIMD steps, if the input is quantized in 8-bit, using \verb|__builtin_pulp_sdotsp4|, or as \textbf{four} 2-way SIMD steps if the input is quantized in 8-bit, 
+        using \verb|__builtin_pulp_sdotsp2|: in both cases, since the number of operations is odd, the ninth operands (the last one) must be accumulated as a scalar operation.
+        The kernel weights are already aligned in memory by design, since they are stored as arrays with the correct operand type (\verb|int16| or \verb|int8|), therefore they do not
+        need an intermediate packing step, which would add computational overhead: we simply need to get dereference a pointer of the weight array at the correct place, and cast it to the
+        vectorized type, \verb|v2s| or \verb|v4s|. The input array, however, since we can perform operations on dilated windows of its input, the dot product operands are not aligned
+        for dilation scales greater than one. We then inevitably incur the small penalty of packing them using \verb|__builtin_pulp_pack2| or \verb|__builtin_pulp_pack4|, accordingly.
+
+        In terms of Step 2, experiments have shown during development that vectorizing the computations did not improve the execution time. This is due to the irregularity of the computational
+        flow, since the scaling operations are selectively performed on the feature vector depending on the current sample value.
+
+        Lastly, Step 3 is also vectorized, with a fixed 4-way SIMD, since experiments during development revealed no impact in accuracy of quantizing the Logistic Regression weights in 8-bit,
+        instead of using 16-bit or event 32-bit. 
+
+        Table \ref{tbl:vect_summary} summarizes the above discussion, enumerating the vectorization levels on each of the algorithm computation steps.
+
         \begin{table}[H]
         \begin{tabular}{||p{1.5in}|p{1.5in}|p{2.5in}||}
             \hline
             Stage & Vectorized ? & Rationale  \\
 
             \hline\hline
-            Stage 1 - RCK            & 2-way SIMD & Operands are 16-bit, but not always packed (dilations).\\
+            Stage 1 - RCK            & 2-way or 4-way SIMD & Operands are 16-bit, or 8-bit, but not always packed (dilations).\\
             \hline
             Stage 2 - Sparse Scaling & No         & Calculation flow is irregular, performance did not improve.\\
             \hline
@@ -224,9 +306,21 @@
         \label{tbl:vect_summary}
         \end{table}
 
-        \subsubsection{Parallelization}\label{sec:im_nanohydra_embimp_paral}
+        \subsection{Parallelization}\label{sec:im_nanohydra_embimp_paral}
 
-        % Table with vectorization of each stage |stage|SIMD|rationale
+        Taking into account the discussion and conclusions from Section \ref{sec:im_nanohydra_usage_cc}, we choose to only parallelize the most computationally intensive step
+        of the algorithm, Step 1. 
+
+        The choice is made to parallelize the computation at the \textbf{group} level. The reason for this that NanoHydra topologies always use a minimum Of
+        \textbf{sixteen} groups of \texbf{eight} kernels each. Therefore, we are guaranteed to always maximize the usage of all eight cores, even in the smallest
+        usable topologies of the model. Furthermore, this means parallelizing at the outermost level of the \verb|hydra_convolve| function, maximizing the amount of time
+        each core spends in computation, avoiding introducing many synchronization barriers which would add overhead. 
+
+        The CC of GAP9 follows a fork-join computation paradigm similar to that of GPUs. Each core has its own stack, but they run the same instructions and operate on the
+        shared L1 memory space. Through the function \verb|pi_core_id()| each core knows its ID, and we can then use this value to share the workload among the cores, by restricting
+        each core's activities to a given section of the workload. In our case, we use the group index as the argument to this comparison. This follows a more efficient and
+        simple \emph{bare metal} parallelization scheme, without having to resort to OpenMP pragmas.
+
         \begin{table}[H]
         \begin{tabular}{||p{1.5in}|p{1.5in}|p{2.5in}||}
             \hline
@@ -243,5 +337,3 @@
         \caption{Parallelization per computation stage}
         \label{tbl:vect_summary}
         \end{table}
-
-        % Table with parallelization of each stage |stage|level|rationale
