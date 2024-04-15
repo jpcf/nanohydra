@@ -1,5 +1,24 @@
 \chapter*{Abstract}
 
+This work aims to implement Hydra, a time-series classification algorithm, in the GAP9 microcontroller, and benchmark its suitability
+as a lightweight, energy-efficient model for edge computation. Hydra is proposed as a target-agnostic time-series classification algorithm, that
+shows close to state-of-the-art accuracy over the UCR Dataset Archive (a time-series classification benchmark), while at the same time training and 
+doing inference at a fraction of the time that other similarly accurate algorithms need. This makes it a natural candidate for an embedded implementation.
+We explain the changes made to Hydra to make it even more suitable to the memory, performance and energy constraints of an embedded system  while minimizing
+the possible loss in accuracy that results from that process. 
+
+To this new and optimized model we call \emph{Nano}Hydra, and we benchmark its accuracy against 
+the original results of Hydra, and we use a specific dataset from the UCR Archive, the ECG5000, to demonstrate its fitness as an energy-efficient time-series classification
+algorithm, comparing its different topologies, the trade-offs between performance and design complexity, and how it compares to similar works in literature.
+NanoHydra maintains a good level of accuracy across the UCR Archive Dataset, and achieves state-of-the-art accuracy and embedded performance in the ECG5000 dataset. 
+Furthermore, it is possible to train it in just under 5 seconds using a multicore CPU, without needing GPUs to accelerate training. 
+
+Lastly, we enhance Hydra/NanoHydra by proposing a \emph{multichannel} architecture, and test it with the Google Speech Commands dataset, one of \emph{de facto} standards for KWS.
+
+In conclusion, Hydra is a fast and accurate time-series classification algorithm suitable as a foundational model for edge computation, which not only provides lightweight inference, but also
+extremely fast training times.
+
+
 %The abstract summarizes what this report is about.
 %It focusses on the big picture and does not go into details.
 %You should write concisely about the following points:

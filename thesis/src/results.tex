@@ -61,14 +61,25 @@ As a result of this work, the following deliverables were produced:
 \end{itemize}
 
 \section{Accuracy on the UCR Dataset Archive}\label{sec:acc_ucr}
+To evaluate the fitness of our embedded NanoHydra against a wide range of different problems, we evaluate its bit-accurate python model against the entire UCR Dataset Archive and
+compare its results with the original Hydra algorithm formulation \cite{Dempster2023Hydra}, which was executed at its most powerful topology with $g=64$ groups, in 32-bit floating point.
+Since this model is bit-accurate, it is equivalent to run this model or the C-implementation on the GAP9 simulator/board, but significantly faster. We leave the benchmarking of embedded-specific metrics
+across the different model topologies to a \emph{specific dataset}, the ECG5000, in Section \ref{sec:rs_arch_ecg5000}, where the GAP9 simulator and development board are used.
 
-\begin{figure}
+Each dataset in the UCR Archive was trained using its training set, and inferred using its test set. This procedure was repeated 20 times for each dataset, and the best accuracy of each run was kept.
+Then, for each dataset, the absolute difference between the accuracy reported in \cite{Dempster2023Hydra} and our results was calculated, and a histogram was produced. This procedure was repeated for four NanoHydra topologies,
+by combining two levels of quantization of the input time series, Q16 and Q8, and two model topologies, with $g=16$ and $g=64$ groups (more groups means a \emph{larger} model); and in both cases, the number of kernels per groups
+was kept constant at $k=8$ (in line with what was done in \cite{Dempster2023Hydra}), and the maximum number of dilations was kept at $N\sb{\text{dil}}=10$. 
+On the other hand, \cite{Dempster2023Hydra} was tested at the largest model, $g=64$, and with no upper bound on $N\sb{\text{dil}}$, the dilation levels, which makes models more accurate at the expense of heavier computational load.
+Figures \ref{fig:ucr_hist_vs_q_g16} and \ref{fig:ucr_hist_vs_q_g64} show the aforementioned histograms. All figures compare both quantization levels, but each of them represents a given value of $g$.
+
+\begin{figure}[h!]
     \centerfloat
     \includegraphics[width=0.75\textwidth]{fig/fig_vs_q_g16_histogram_dev.pdf}
     \caption{Histogram of absolute accuracy deviations of this work to \cite{Dempster2023Hydra} for $g=16$.}
     \label{fig:ucr_hist_vs_q_g16}
 \end{figure}
-\begin{figure}
+\begin{figure}[h!]
     \centerfloat
     \includegraphics[width=0.75\textwidth]{fig/fig_vs_q_g64_histogram_dev.pdf}
     \caption{Histogram of absolute accuracy deviations of this work to \cite{Dempster2023Hydra} for $g=64$.}
@@ -76,10 +87,17 @@ As a result of this work, the following deliverables were produced:
 \end{figure}
 
 \section{Topological exploration on the ECG5000 Dataset}\label{sec:rs_arch_ecg5000}
-To be done.
+In this section, we perform some deeper analysis on the NanoHydra algorithm, by using one of the UCR Datasets as a study case, the ECG5000 dataset.
+The ECG5000 dataset consists of 1 second samples of ECG recordings, sampled at 140 Hz, where we have \textbf{five classes}: four types of arrythmias, and the ``No Arrhythmia'' class.
+There is a total of 5000 samples, split into 500 training samples and 4500 test samples. This makes it a nice benchmarking dataset, since the heavy imbalance of train/test samples proves an
+algorithm's suitability to generalized from a limited test set, and is especially challenging for data-intensive algorithms, favoring those that are stronger one-shot learning capabilities.
+Section \ref{sec:rs_acc_topo} presents a study of the influence of the hyperparameters on the prediction accuracy, and Section \ref{sec:rs_gap9_meas} performs
+measurements on embedded-targeted metrics using the GAP9 simulator and development board using a selection of two representative algorithm topologies, explained in Table \ref{tbl:gap9_test_cfg}.
 
-\subsection{Accuracy over different topologies}
-To be done.
+\subsection{Hyperparameter influence on accuracy}\label{sec:rs_acc_topo}
+Four algorithm topologies, in increasing levels of complexity, are tested against the ECG5000. Figures \ref{fig:vs_g_q16} to \ref{fig:vs_dil_q8} list the hyperparameter configuration used in each of the four topologies.
+The data points correspond to the \emph{average} accuracy across \textbf{five} runs of that configuration, and the error bars mark the minimum and maximum accuracy across the five runs for that configuration. In each run, the model
+is trained from scratch, and inferred across the test set. The training cycle is extremely fast, as on average we are able to perform a full train+inference cycle in just under 5 seconds, using a CPU and not a GPU. 
 
 \begin{figure}[h!]
     \centerfloat
@@ -91,26 +109,43 @@ To be done.
     \centerfloat
     \includegraphics[width=0.75\textwidth]{fig/score_vs_g_q8.pdf}
     \caption{Accuracy of NanoHydra for the ECG5000 dataset across different values of $g$, input quantized in 8-bit. Four topologies considered, in increasing complexity, listed in the legend.}
-    \label{fig:vs_g_q16}
+    \label{fig:vs_g_q8}
 \end{figure}
 \begin{figure}[h!]
     \centerfloat
     \includegraphics[width=0.75\textwidth]{fig/score_vs_dil_q16.pdf}
     \caption{Accuracy of NanoHydra for the ECG5000 dataset across different dilation levels $N\sb{\text{dil}}$, input quantized in 16-bit. Four topologies considered, in increasing complexity, listed in the legend.}
-    \label{fig:vs_g_q16}
+    \label{fig:vs_dil_q16}
 \end{figure}
 \begin{figure}[h!]
     \centerfloat
     \includegraphics[width=0.75\textwidth]{fig/score_vs_dil_q8.pdf}
     \caption{Accuracy of NanoHydra for the ECG5000 dataset across different dilation levels $N\sb{\text{dil}}$, input quantized in 8-bit. Four topologies considered, in increasing complexity, listed in the legend.}
-    \label{fig:vs_g_q16}
+    \label{fig:vs_dil_q8}
 \end{figure}
-
+We can see a few common features in all Figures. The largest model topologies suffer from a decrease in accuracy as the hyperparameter variable increases; furthermore, the spread of accuracies is also very large, representing an absolute swing of almost 15 \% in the worse case.
+This represents an interesting feature of this algorithm: \emph{more} is not \emph{better}, and smaller more efficient topologies result in better performing models. 
+The explanation is that an increase in the feature vector length can produce a redundant number of features, that are counterproductive in terms of the ability of the classifier to learn.
+On the other hand, we note the same effect for excessively \emph{small} models, where the accuracy is lower, but surprisingly not as low as in the excessively large models.
+Figures \ref{fig:vs_g_q16} and \ref{fig:vs_g_q8} reveal that, apart from the aforementioned outlier topology, accuracy tends to increase with the number of groups, but this increase tends to show diminishing returns.
+We also see that, for the same number of groups, the accuracy is higher when $N\sb{\text{dil}} = 10$ than when $N\sb{\text{dil}} = 1$.
+In a first analysis, it might seem that higher $N\sb{\text{diff}}$ tend to produce lower accuracies. 
+However, turning our attention to Figures \ref{fig:vs_dil_q16} and \ref{fig:vs_dil_q8}, where the test hyperparameter is, instead, the level of dilations,
+we see that the dilation level also has a significant impact on the usefulness of $N\sb{\text{diff}}$, and $N\sb{\text{diff}}$ cannot be analyzed in isolation.
+We can see that there is an optimal number of dilations between $2 \leq N\sb{\text{dil}} \leq 4$, and that $N\sb{\text{diff}} = 2$ has a slightly higher accuracy than $N\sb{\text{diff}} = 1$.
+Lastly, we can see that the level of quantization of the inputs has limited impact on the accuracy.
 
 \subsection{GAP9 Measurements}\label{sec:rs_gap9_meas}
-To be done.
+In this section, we list embedded-specific benchmarks of the NanoHydra model on the ECG5000 dataset. 
+In Table \ref{tbl:gap9_test_cfg}, we establish two representative hyperparameter configurations on which we test several variations of the implementation.
+These configuration were chosen in accordance to the observations of Section \ref{sec:rs_acc_topo}, so that we have two design points of similar accuracy but one is approximately
+a third the size of the other. This can be seen in terms of the memory requirements per computation stage in Table \ref{tbl:gap9_test_cfg_reqmem}, and in terms of number of millions of
+multiply-accumulate operations in Table \ref{tbl:gap9_test_cfg_reqcomp}. In Table \ref{tbl:gap9_inf_results} we present inference benchmarks of the configurations listed before, with some
+variations, namely different levels of quantization of the input (8-bit or 16-bit) implying that different levels of SIMD are used (2-way or 4-way, respectively), which has an impact
+in the inference time. Each design configuration was trained 20 times in the development PC, the weights of the most accurate model were deployed to the GAP9 simulator/board where they were inferred 20 times,
+across which the total number of cycles was averaged. The inference time assumes a clock speed of 100 MHz.
 
-\begin{table}[h!]
+\begin{table}[p!]
     \centerfloat
     \rowcolors{2}{lightgray}{white}
     \begin{tabular}{ c c c c c c c }
@@ -125,7 +160,7 @@ To be done.
     \label{tbl:gap9_test_cfg}
 \end{table}
 
-\begin{table}[h!]
+\begin{table}[p!]
     \centerfloat
     \rowcolors{2}{lightgray}{white}
     \begin{tabular}{ c c c c }
@@ -140,7 +175,7 @@ To be done.
     \label{tbl:gap9_test_cfg_reqmem}
 \end{table}
 
-\begin{table}[h!]
+\begin{table}[p!]
     \centerfloat
     \rowcolors{2}{lightgray}{white}
     \begin{tabular}{ c c c }
@@ -155,7 +190,7 @@ To be done.
     \label{tbl:gap9_test_cfg_reqcomp}
 \end{table}
 
-\begin{table}[h!]
+\begin{table}[p!]
     \centerfloat
     \rowcolors{2}{lightgray}{white}
     \begin{tabular}{ c c c c c c c c}
@@ -167,14 +202,29 @@ To be done.
     Q8  & CFGA & Yes & 94.13\% & 0.0956 & 0.956 ms & t.b.d. & 38 s\\
     Q8  & CFGB & Yes & 94.47\% & 0.2990 & 2.990 ms & t.b.d. & 95 s\\
     Q16 & CFGA & No  & 94.38\% & 0.7162 & 7.162 ms & t.b.d. & 38 s\\
-    Q8  & CFGB & No  & 94.13\% & 0.4823 & 4.823 ms & t.b.d. & 38 s\\
+    Q8  & CFGA & No  & 94.13\% & 0.4823 & 4.823 ms & t.b.d. & 38 s\\
     \bottomrule
     \end{tabular}
-    \caption{Inference Results of the ECG5000 dataset on the GAP9. Results presented correspond to the average of 20 training/inference rounds. The reported accuracy is the maximum across these rounds, the train time is the total time of all 20 training rounds.}%
+    \caption{Inference Results of the ECG5000 dataset on the GAP9. Results presented correspond to the average of 20 inference rounds. The reported accuracy is the maximum across the training rounds, the train time is the total time of all 20 training rounds.}%
     \label{tbl:gap9_inf_results}
 \end{table}
+The accuracy of all design points is above 94 \%, and the absolute difference between the most and least accurate is as low as 0.5\%. 
+The effect of increasing the quantization level from 16-bit to 8-bit consistently lowers the accuracy, but by only a mere 0.2\%, while at the same time substantially speeding up the inference time by 40\%.
+Parallelization has no impact on accuracy, as the model is still the same, only compiled without parallelization enabled. Parallelization seems to consistently speed up the computations by \~5.5x, instead of the theoretical maximum of 8x. 
+The discrepancy is explained by two factors. First, the parallel section incurs on the small additional overhead of copying-in and copying-out the operands. Second, we are only parallelizing Step 1, which although accounts
+for roughly 99 \% of the MAC operations as explained in Section \ref{tbl:im_nanohydra_rel_eff}, this is not directly translated into inference time, since they are also only a fraction of the type of computations performed inside Step 1.
+If instead we consider that Step 1 makes up 94 \% of the computational time, then according to Amdahl's law 
 
-\newpage
+\begin{equation}
+s = \frac{1}{(1-f) + \frac{f}{p}}
+\end{equation}
+which allows us to calculate the speed-up $s$ that we get by parallelizing a fraction $f$ of the computation time by $p$ processors,
+we get that $s \approx 5.6$ when $f=0.94$ and $p=8$, as is the case in our situation.
+
+Lastly, a word should be given about the training time. We remarkably take only $95 / 20 \approx 4.75$ seconds to train the most accurate model, without using any GPU, but only a CPU.
+Using this model is energy-efficient not only in the embedded MCU at inference time, but also during training at the PC Workstation, since not only CPUs consume less power than GPUs
+\footnote{The model was trained in an AMD Ryzen9 5900X CPU, which has a TDP of 105W. For instance, a Nvidia RTX 4090 GPU has a TDP of 450W}, the model only draws power for $\approx5$ seconds during each training round. 
+
 \subsection{Comparison to Related Work}
 
 \section{Proposal for Speech Commands Dataset}\label{sec:rs_speechcomms}
@@ -182,19 +232,22 @@ To be done.
 
 \subsection{Comparison to Related Work}
 \begin{table}
-\begin{tabular}{||c|c|c|c|c|c|r|r||}
-    \hline
+\centerfloat
+\rowcolors{2}{lightgray}{white}
+    \begin{tabular}{ c c c c c c c c}
+    \toprule
     Reference & Model & TestAC & Memory & Ops & Year & Citation & Reproducible? \\
 
-    \hline\hline
+    \midrule
     \cite{Zhang2017}   &        DS-CNN & 94.4\% & 38.6 kB & 5.4M & 2017 & 483 &  \href{https://github.com/ARM-software/ML-KWS-for-MCU}{Yes} \\
     \cite{Andrade2018} &       Att-RNN & 96.9\% &  202 kB &   ?? & 2018 & 113 &  No \\
     \cite{Tang2018}    &       ResNet8 & 94.1\% &  110 kB &  30M & 2018 & 241 &  \href{https://github.com/castorini/honk/}{Yes} \\
     \cite{Tang2018}    & ResNet-Narrow & 90.1\% & 19.9 kB & 5.7M & 2018 & 241 &  \href{https://github.com/castorini/honk/}{Yes} \\
     \cite{Jansson2018} &    ConvNetRaw & 89.4\% &  700 kB &   5M & 2018 &  19 &  No \\
     \textbf{Ours}      &     NanoHydra & 88.7\% & 56.1 kB & 2.6M & 2024 & n/a &  Yes \\
-    \hline
+    \bottomrule
 \end{tabular}
+\caption{Comparison of the Google Speech Commands inference benchmarks with related work}
 \end{table}
 
 %\section{Current limitations}

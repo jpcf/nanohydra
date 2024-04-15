@@ -213,13 +213,13 @@
 
         \subsubsection{C Optimizations}
         As referenced before, Step 1 of algorithm produces a feature vector, which is a result of the concatenation of the RCK passes through dilated and differentiated versions of the input time series. It was chosen to linearize
-        the feature vector instead of using a multidimensional array for each group, dilation and differentiation level, since this would require several levels of pointer dereferencing. Furthermore, since the features are concatenatated in 
+        the feature vector instead of using a multidimensional array for each group, dilation and differentiation level, since this would require several levels of pointer dereferencing. Furthermore, since the features are concatenated in 
         a consistent fashion, we can slice the portion of the feature vector that each group of kernels is working on, get a pointer to each of those locations, and avoid repeating the pointer arithmetic computations on every access. This resulted
         in performance gains of up to 20\%.
 
         \subsubsection{Usage of the GAP9 Compute Cluster}\label{sec:im_nanohydra_usage_cc}
         Using the GAP9 CC comes with great potential execution time gains, due to the possibility of parallelizing a work load over 8 cores. However, the CC should be switched off after the parallel computation finishes, since
-        its chip power domain consumes extra power; and whenever it is powered down, the L1 RAM contents are lost, since they are volatile. This means that for every power cycle there is considerable memory traffic from the shared L2 RAM into
+        its chip domain consumes extra power; and whenever it is powered down, the L1 RAM contents are lost, since they are volatile. This means that for every power cycle there is considerable memory traffic from the shared L2 RAM into
         the L1 RAM of the CC (on which CC has lower access latency), which is coordinated and streamlined by the DMA block.
 
         Therefore, the decision of using the CC is a balance between:        
