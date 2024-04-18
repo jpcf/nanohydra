@@ -197,6 +197,24 @@ Using this model is energy-efficient not only in the embedded MCU at inference t
 
 \subsection{Comparison to Related Work}
 
+\begin{table}[p!]
+    \centerfloat
+    \rowcolors{2}{lightgray}{white}
+    \begin{tabular}{ c c c c c c c c}
+    \toprule
+    \textbf{Work} & \textbf{Device} & \textbf{Accuracy} & \textbf{Inf. Time} & \textbf{Inf. Energy} & \textbf{Model Size} & \textbf{Train Time} \\
+    \midrule
+    Ours (Most Accurate)          & GAP9 @ 100 MHz & 94.67\% & 4.189 ms  & 51.14 \mu J & 12.57 kB & 95 s \\
+    Ours (Most En. Eff.)          & GAP9 @ 100 MHz & 94.13\% & 0.956 ms  & 14.22 \mu J & 3.82  kB & 38 s \\
+    1D TCN \cite{Zemouri2023}     & STM32L432 @ 80 MHz & 95.1 \% & 121.38 ms & N/A & 52.43 kB & N/A  \\
+    ECG-TCN \cite{Ingolfsson2021} & GAP8 @ 100 MHz & 93.8 \% & 2.7 ms & 100 \mu J  & 26.63 kB & N/A  \\
+    NAS-TCN \cite{Burrello2023}   & GAP8 @ 100 MHz & 94.2 \% & 2.69 ms & 140 \mu J & 15.2 kB &  $10\sp{4}$ s \\
+    \bottomrule
+    \end{tabular}
+    \caption{Inference Results of the ECG5000 dataset on the GAP9. Results presented correspond to the average of 20 inference rounds. The reported accuracy is the maximum across the training rounds, the train time is the total time of all 20 training rounds.}%
+    \label{tbl:gap9_inf_results}
+\end{table}
+
 \section{Multichannel NanoHydra for KWS}\label{sec:rs_speechcomms}
 Hydra as formulated in \cite{Dempster2023Hydra} supports only single channel time series data.
 In fact, some types of time-series data has more than one channel. This is the case for audio data, for instance.
