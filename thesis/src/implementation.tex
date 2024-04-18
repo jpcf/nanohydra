@@ -86,7 +86,7 @@
         However, we should note lastly that since the convolutional outputs $y[n]$ are intermediately stored in 32-bit, it can happen that its final value indeed needs more than 16-bits to be stored
         (e.g. suppose all kernel weights are one, and the input data points are all equal to the maximum positive value of a signed 16-bit integer, the result needs more than 16-bits to be correctly represented).
         This would require our feature vector to use 32-bit signed representation, which double its memory requirements, compared to using a signed 16-bit representation like the convolution operands. To keep the latter
-        representation, we proposed performing an \textbf{an arithmetic shift} on the convolution output \textbf{before} its accumulation in the feature vector, such that the cast from 32-bit to 16-bit and that subsequent accumulations at that index do not overflow.
+        representation, we proposed performing \textbf{an arithmetic shift} on the convolution output \textbf{before} its accumulation in the feature vector, such that the cast from 32-bit to 16-bit and that subsequent accumulations at that index do not overflow.
         \footnote{This issue indeed happened during the development, and was one of the issues that consumed some debugging effort, since the Python Model vs C Implementation equivalence check was failing. 
         The arithmetic shift solution was formulated precisely to tackle this issue}
         Note that this is done at the expense of discarding some fractional bits, which have proven to cause no accuracy degradation. This is exactly one of the benefits of using a dictionary method for crafting these features: the
@@ -213,8 +213,8 @@
 
         \subsubsection{C Optimizations}
         As referenced before, Step 1 of algorithm produces a feature vector, which is a result of the concatenation of the RCK passes through dilated and differentiated versions of the input time series. It was chosen to linearize
-        the feature vector instead of using a multidimensional array for each group, dilation and differentiation level, since this would require several levels of pointer dereferencing. Furthermore, since the features are concatenated in 
-        a consistent fashion, we can slice the portion of the feature vector that each group of kernels is working on, get a pointer to each of those locations, and avoid repeating the pointer arithmetic computations on every access. This resulted
+        the feature vector instead of using a multidimensional array for each group, dilation and differentiation level, since this would require several levels of pointer dereferencing. Furthermore, since the features are concatenated consistently, 
+        we can slice the portion of the feature vector that each group of kernels is working on, get a pointer to each of those locations, and avoid repeating the pointer arithmetic computations on every access. This resulted
         in performance gains of up to 20\%.
 
         \subsubsection{Usage of the GAP9 Compute Cluster}\label{sec:im_nanohydra_usage_cc}

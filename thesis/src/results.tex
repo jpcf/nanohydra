@@ -1,36 +1,6 @@
 \chapter{Results}
 \label{ch:results}
 
-%In this chapter, you want to show that your implementation meets the objectives.
-%Start by briefly describing the type of results you have collected and how these results relate to the objectives.
-%
-%\section{Evaluation setup}
-%
-%Precisely describe your measurement/evaluation setup in a top-down manner.
-%For example:
-%\begin{itemize}
-%  \item If you used a development platform, which one and how was it configured?
-%  \item Which tools did you use?
-%  \item What input data set / program / signals / \ldots{} did you use?
-%    If your data set is very large, you should fully define and describe it in an appendix chapter and refer to that definition here using simple labels.
-%  \item If your implementation is configurable, which configuration(s) did you evaluate?
-%\end{itemize}
-%
-%The information given here (with references to external work) should be sufficient to reproduce the setup you used for your measurements.
-%
-%\section{UCR Dataset Archive Results}
-%\include{./data/csv_table.tex}
-%
-%
-%Structure the rest of this chapter into sections.
-%For example, each section could discuss a different figure of merit or a different part of your implementation.
-%As usual, discuss structure and content in advance with your advisors.
-%
-%\section{Comparison to related work}
-%
-%Compare your results to those achieved by others working on similar problems.
-%This can be done in a separate section or directly in the sections above.
-
 \section{Overview}
 
 In this chapter, the accuracy results for the NanoHydra algorithm are presented, as well as some benchmarks from its embedded implementation on the GAP9.
@@ -60,7 +30,7 @@ As a result of this work, the following deliverables were produced:
     \item Multichannel Hydra architecture, which is tested against the Google Speech Commands \cite{Warden2018}.
 \end{itemize}
 
-\section{Accuracy on the UCR Dataset Archive}\label{sec:acc_ucr}
+\section{Accuracy on the UCR Dataset Archive}\label{sec:rs_acc_ucr}
 To evaluate the fitness of our embedded NanoHydra against a wide range of different problems, we evaluate its bit-accurate python model against the entire UCR Dataset Archive and
 compare its results with the original Hydra algorithm formulation \cite{Dempster2023Hydra}, which was executed at its most powerful topology with $g=64$ groups, in 32-bit floating point.
 Since this model is bit-accurate, it is equivalent to run this model or the C-implementation on the GAP9 simulator/board, but significantly faster. We leave the benchmarking of embedded-specific metrics
@@ -138,7 +108,7 @@ Lastly, we can see that the level of quantization of the inputs has limited impa
 \subsection{GAP9 Measurements}\label{sec:rs_gap9_meas}
 In this section, we list embedded-specific benchmarks of the NanoHydra model on the ECG5000 dataset. 
 In Table \ref{tbl:gap9_test_cfg}, we establish two representative hyperparameter configurations on which we test several variations of the implementation.
-These configuration were chosen in accordance to the observations of Section \ref{sec:rs_acc_topo}, so that we have two design points of similar accuracy but one is approximately
+These configurations were chosen in accordance to the observations of Section \ref{sec:rs_acc_topo}, so that we have two design points of similar accuracy but one is approximately
 a third the size of the other. This can be seen in terms of the memory requirements per computation stage in Table \ref{tbl:gap9_test_cfg_reqmem}, and in terms of number of millions of
 multiply-accumulate operations in Table \ref{tbl:gap9_test_cfg_reqcomp}. In Table \ref{tbl:gap9_inf_results} we present inference benchmarks of the configurations listed before, with some
 variations, namely different levels of quantization of the input (8-bit or 16-bit) implying that different levels of SIMD are used (2-way or 4-way, respectively), which has an impact
@@ -197,12 +167,12 @@ across which the total number of cycles was averaged. The inference time assumes
     \toprule
     \textbf{Quantz.} & \textbf{Config} & \textbf{Parallel} & \textbf{Accuracy} & \textbf{MCycles} & \textbf{Inf. Time} & \textbf{Inf. Energy} & \textbf{Train Time} \\
     \midrule
-    Q16 & CFGA & Yes & 94.38\% & 0.1312 & 1.312 ms & t.b.d. & 38 s\\
-    Q16 & CFGB & Yes & 94.67\% & 0.4184 & 4.189 ms & t.b.d. & 95 s\\
-    Q8  & CFGA & Yes & 94.13\% & 0.0956 & 0.956 ms & t.b.d. & 38 s\\
-    Q8  & CFGB & Yes & 94.47\% & 0.2990 & 2.990 ms & t.b.d. & 95 s\\
-    Q16 & CFGA & No  & 94.38\% & 0.7162 & 7.162 ms & t.b.d. & 38 s\\
-    Q8  & CFGA & No  & 94.13\% & 0.4823 & 4.823 ms & t.b.d. & 38 s\\
+    Q16 & CFGA & Yes & 94.38\% & 0.1312 & 1.312 ms & 15.85 \mu J & 38 s\\
+    Q16 & CFGB & Yes & 94.67\% & 0.4184 & 4.189 ms & 51.14 \mu J & 95 s\\
+    Q8  & CFGA & Yes & 94.13\% & 0.0956 & 0.956 ms & 14.22 \mu J & 38 s\\
+    Q8  & CFGB & Yes & 94.47\% & 0.2990 & 2.990 ms & 38.32 \mu J & 95 s\\
+    Q16 & CFGA & No  & 94.38\% & 0.7162 & 7.162 ms & 63.43 \mu J & 38 s\\
+    Q8  & CFGA & No  & 94.13\% & 0.4823 & 4.823 ms & 42.15 \mu J & 38 s\\
     \bottomrule
     \end{tabular}
     \caption{Inference Results of the ECG5000 dataset on the GAP9. Results presented correspond to the average of 20 inference rounds. The reported accuracy is the maximum across the training rounds, the train time is the total time of all 20 training rounds.}%
@@ -227,31 +197,58 @@ Using this model is energy-efficient not only in the embedded MCU at inference t
 
 \subsection{Comparison to Related Work}
 
-\section{Proposal for Speech Commands Dataset}\label{sec:rs_speechcomms}
-To be done.
+\section{Multichannel NanoHydra for KWS}\label{sec:rs_speechcomms}
+Hydra as formulated in \cite{Dempster2023Hydra} supports only single channel time series data.
+In fact, some types of time-series data has more than one channel. This is the case for audio data, for instance.
+In KWS tasks, for instance, we generally transform the input audio signal with MFCC, generating several streams of spectral samples across time.
+Towards the purpose of using MFCC transforms to use as input to a KWS classifier, we expanded the capabilities of Hydra by simply
+repeating the RCK transform for all MFCC channels, and concatenating the output from all channels in our feature vector.
+The proposed change was performed, and the experiment settings were the following:
+
+\begin{itemize}
+    \item \textbf{Data Augmentation} - Augment underrepresented classes such that we end up with roughly the same number of training 
+                                       samples per class ($2\times$ 'Unknown' class, $80\times$ 'Silence' class, $15\times$ all others).
+                                       The augmentation techniques were two: time-shift the samples by an amount uniformly sampled from the interval [-150ms, 150ms]; add a random noise sample from the 'Silence' class, with volume scaling uniformly sampled from the interval [0, 0.15].
+    \item \textbf{MFCC Transform} - window length of 512 samples, hop length of 128. The FFT length is 512 samples long and the maximum frequency set to the Nyquist frequency of 8000Hz. We select the 8 lowest MFCC channels.
+    \item \textbf{NanoHydra Transform} - $N\sb{\text{diff}} = 2$, $N\sb{\text{dil}} = 2$, $k=8$ and $g=32$
+\end{itemize}
+The initial results were not very convincing. We started by running Hydra on the raw waveform, but that yielded accuracies in the range of 60\%. The introduction of the MFCC transform and data augmentation improved the prediction
+accuracy substantially, by bringing it over the 80\% mark. However, the accuracy still would not improve with increased model size or with the tuning of hyperparameters. Looking again at how NanoHydra works, one can
+see that this model \textbf{accumulates} the statistics of the patterns it detects. This is a problem, in the sense that the after/before speech areas of the sample would ``pollute'' these statistics with non-signal information.
+Therefore, we implemented a mechanism that sets to zero the MFCC channels whenever the signal power (approximated by the lowest MFCC channel) is lower than a given threshold. This yielded a significant improvement, increasing the
+prediction accuracy up to 85\%. Lastly, normalizing the MFCC channels on a per-channel basis yielded another substantial improvement up to close to 89\%. When such a normalization procedure is in place, the lowest MFCC channel threshold
+used is zero, and our experiences have shown that any value lower or higher does not improve prediction accuracy. These changes made NanoHydra usable, achieving an acceptable, but slightly far from SOTA prediction accuracy. They are a substantial
+contribution to how Hydra/NanoHydra can be used in KWS problems, and serve as a basis for future work.
+
+The accuracy results, along with the comparison to related work, are shown in Table \ref{tbl:rs_speechcomms}
+
 
 \subsection{Comparison to Related Work}
+As we can see, the NanoHydra results on the Google Speech Commands dataset, although still within the 
+acceptable range, are not competitive with other published architectures that achieve higher prediction accuracies, while
+still having faster and more compact models. A large design exploration has been 
 \begin{table}
 \centerfloat
 \rowcolors{2}{lightgray}{white}
     \begin{tabular}{ c c c c c c c c}
     \toprule
-    Reference & Model & TestAC & Memory & Ops & Year & Citation & Reproducible? \\
+    Reference & Model & Test Accuracy & Memory & Ops & Year & Citation & Reproducible? \\
 
     \midrule
     \cite{Zhang2017}   &        DS-CNN & 94.4\% & 38.6 kB & 5.4M & 2017 & 483 &  \href{https://github.com/ARM-software/ML-KWS-for-MCU}{Yes} \\
-    \cite{Andrade2018} &       Att-RNN & 96.9\% &  202 kB &   ?? & 2018 & 113 &  No \\
+    \cite{Andrade2018} &       Att-RNN & 96.9\% &  202 kB &   ?? & 2018 & 113 &  Yes \\
     \cite{Tang2018}    &       ResNet8 & 94.1\% &  110 kB &  30M & 2018 & 241 &  \href{https://github.com/castorini/honk/}{Yes} \\
     \cite{Tang2018}    & ResNet-Narrow & 90.1\% & 19.9 kB & 5.7M & 2018 & 241 &  \href{https://github.com/castorini/honk/}{Yes} \\
     \cite{Jansson2018} &    ConvNetRaw & 89.4\% &  700 kB &   5M & 2018 &  19 &  No \\
     \textbf{Ours}      &     NanoHydra & 88.7\% & 56.1 kB & 2.6M & 2024 & n/a &  Yes \\
     \bottomrule
 \end{tabular}
+\label{tbl:rs_speechcomms}
 \caption{Comparison of the Google Speech Commands inference benchmarks with related work}
 \end{table}
 
-%\section{Current limitations}
-%
-%Demonstrating that your implementation meets the objectives is usually done by showing a lower bound on a given figure of merit.
-%Conversely, you should also illuminate the limitations of your implementation by showing upper bounds on these (or other appropriate) figures of merit.
-%Critically examining your ideas and their implementation trying to find their limits is also part of your work!
+\section{Current limitations}
+The main current limitation of NanoHydra is its limited accuracy in the Google Speech Commands dataset. The multichannel architecture we propose seems to greatly benefit from the MFCC transform, 
+but future potential improvements could be achieved -- not only in this specific dataset, but in other multichannel datasets -- by increasing the dimensionality of the receptive field.
+The approach of this work is to repeat the transform on a per-channel basis, but this implies that the inter-channel patterns and dependencies are not extracted in the convolutional transforms.
+This could be achieved, for instance, by making the randomized kernels to operate as a matrix block, in a fashion similar to that of CNNs.
