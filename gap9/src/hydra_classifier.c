@@ -1,6 +1,5 @@
 #include "../include/hydra.h"
 
-
 void hydra_classifier(Hydra* hydra) {
     #if defined (TARGET_GAP9) && defined (VECTORIZE)
     v4s featVec;
@@ -8,7 +7,8 @@ void hydra_classifier(Hydra* hydra) {
     int8_t *pFeatVec = (int8_t*) hydra->featVec;
     #endif
 
-    for(int c=0; c < hydra->N_classes; c++) {
+    for(uint8_t c=0; c < hydra->N_classes; c++) {
+
         #if defined (VECTORIZE)
         for(int f=0; f < hydra->len_feat_vec; f+=4) {
         #else

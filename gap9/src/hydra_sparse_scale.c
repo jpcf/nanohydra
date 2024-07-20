@@ -1,8 +1,7 @@
 #include "../include/hydra.h"
 
 void hydra_sparse_scale(Hydra *hydra) {
-
-    for(int f=0; f < hydra->len_feat_vec; f++) {
+    for(uint32_t f=0; f < hydra->len_feat_vec; f++) {
 
         // Under-clip to zero, skip normalization if feature is zero
         hydra->featVec[f] = (hydra->featVec[f] < 0 ? 0 : hydra->featVec[f]);

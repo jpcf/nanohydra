@@ -47,17 +47,18 @@ typedef struct Hydra {
     // Scaler Attributes
     int16_t *featMean;
     uint8_t *featStd;
+    int8_t temp[6];
 
 } Hydra;
 
 #ifdef TARGET_GAP9
 typedef struct {
-    RCKINT  * inX;
-    RCKINT  * inW;
-    int16_t * featVec;
-    uint8_t  dil;
-    Hydra*   hydra;
-    uint8_t  diff_idx;
+    RCKINT   * inX;
+    RCKINT   * inW;
+    int16_t  * featVec;
+    uint8_t    dil;
+    Hydra*     hydra;
+    uint8_t    diff_idx;
 } TeamForkArgs_T;
 #else
 #endif

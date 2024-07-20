@@ -1,5 +1,6 @@
 
 #include "pmsis.h"
+#include "omp.h"
 #include <bsp/bsp.h>
 #include "../../include/hydra.h"
 #include "../../include/hydra_defines.h"
@@ -10,14 +11,37 @@
 // Problem Defines
 #define INPUT_SZ  2
 #define NUM_SAMPLES 50
-#define BUFFER_SZ   1200
+#define BUFFER_SZ   1500
+
+#define DETAILED_PROFILING 1
+
 
 #ifdef PARALLELIZE
-static PI_L1 RCKINT  inX[BUFFER_SZ], inX_diff[BUFFER_SZ], inW[BUFFER_SZ];
-static PI_L1 int16_t featVec[2*BUFFER_SZ];
+static PI_L1 RCKINT   inX[BUFFER_SZ], inX_diff[BUFFER_SZ], inW[BUFFER_SZ];
+static PI_L1 int16_t  featVec[4*BUFFER_SZ], featMean[BUFFER_SZ];
+static PI_L1 uint8_t  featStd[BUFFER_SZ];
+static PI_L1 int8_t   classf_weights[5][BUFFER_SZ];
+static PI_L1 int8_t   classf_bias[5];
+static PI_L1 int32_t  classf_scores[5];
+
+static PI_L1 uint32_t cycles_dma_copyin_s1     = 0;
+static PI_L1 uint32_t cycles_dma_copyin_s2     = 0;
+static PI_L1 uint32_t cycles_dma_copyin_s3     = 0;
+static PI_L1 uint32_t cycles_dma_wait_s1  = 0;
+static PI_L1 uint32_t cycles_dma_wait_s2  = 0;
+static PI_L1 uint32_t cycles_dma_wait_s3  = 0;
+static PI_L1 uint32_t cycles_compute_s1   = 0;
+static PI_L1 uint32_t cycles_compute_s2   = 0;
+static PI_L1 uint32_t cycles_compute_s3   = 0;
+static PI_L1 uint32_t cycles_dma_copyout  = 0;
 
 void hydra_forward_gap9(void *args) {
     
+    #ifdef DETAILED_PROFILING
+    pi_perf_reset();
+    pi_perf_start();
+    #endif
+
     uint8_t dil_idx;
     uint8_t diff_idx;
     uint8_t chan;
@@ -25,8 +49,11 @@ void hydra_forward_gap9(void *args) {
 
     Hydra* hydra = (Hydra *) args;
     
-    // Copy Input Vector and Weights into L1
+    // Copy Step 1 Input Vector and Weights into L1
     pi_cl_dma_copy_t copy_L2_to_L1_inX, copy_L2_to_L1_inX_diff, copy_L2_to_L1_inW;
+    pi_cl_dma_copy_t copy_L2_to_L1_cw[5];
+    pi_cl_dma_copy_t copy_L2_to_L1_cb, copy_L2_to_L1_norm_avg, copy_L2_to_L1_norm_std;
+
     copy_L2_to_L1_inX.dir   = PI_CL_DMA_DIR_EXT2LOC;
     copy_L2_to_L1_inX.merge = 0;
     copy_L2_to_L1_inX.size  = (uint16_t) hydra->lenX*sizeof(RCKINT);
@@ -51,10 +78,80 @@ void hydra_forward_gap9(void *args) {
     pi_cl_dma_memcpy(&copy_L2_to_L1_inX);
     pi_cl_dma_memcpy(&copy_L2_to_L1_inX_diff);
     pi_cl_dma_memcpy(&copy_L2_to_L1_inW);
+
+    #ifdef DETAILED_PROFILING
+    pi_perf_stop();
+    cycles_dma_copyin_s1 += pi_perf_read(PI_PERF_CYCLES);
+
+    // Copy Step 2 Weights
+    pi_perf_reset();
+    pi_perf_start();
+    #endif
+
+    copy_L2_to_L1_norm_avg.dir   = PI_CL_DMA_DIR_EXT2LOC;
+    copy_L2_to_L1_norm_avg.merge = 0;
+    copy_L2_to_L1_norm_avg.size  = (uint16_t) 2*hydra->len_feat_vec;
+    copy_L2_to_L1_norm_avg.id    = 3;
+    copy_L2_to_L1_norm_avg.ext   = (uint32_t) hydra->featMean;
+    copy_L2_to_L1_norm_avg.loc   = (uint32_t) featMean;
+
+    copy_L2_to_L1_norm_std.dir   = PI_CL_DMA_DIR_EXT2LOC;
+    copy_L2_to_L1_norm_std.merge = 0;
+    copy_L2_to_L1_norm_std.size  = (uint16_t) hydra->len_feat_vec;
+    copy_L2_to_L1_norm_std.id    = 4;
+    copy_L2_to_L1_norm_std.ext   = (uint32_t) hydra->featStd;
+    copy_L2_to_L1_norm_std.loc   = (uint32_t) featStd;
+
+    #ifdef DETAILED_PROFILING
+    pi_perf_stop();
+    cycles_dma_copyin_s2 += pi_perf_read(PI_PERF_CYCLES);
+
+    // Copy Step 3 weights
+    pi_perf_reset();
+    pi_perf_start();
+    #endif
+
+    for(int c=0; c < hydra->N_classes; c++) {
+        copy_L2_to_L1_cw[c].dir   = PI_CL_DMA_DIR_EXT2LOC;
+        copy_L2_to_L1_cw[c].merge = 0;
+        copy_L2_to_L1_cw[c].size  = (uint16_t) hydra->len_feat_vec;
+        copy_L2_to_L1_cw[c].id    = 5+c;
+        copy_L2_to_L1_cw[c].ext   = (uint32_t) hydra->classf_weights[c];
+        copy_L2_to_L1_cw[c].loc   = (uint32_t) classf_weights[c];
+    }
+
+    copy_L2_to_L1_cb.dir   = PI_CL_DMA_DIR_EXT2LOC;
+    copy_L2_to_L1_cb.merge = 0;
+    copy_L2_to_L1_cb.size  = (uint16_t) hydra->N_classes;
+    copy_L2_to_L1_cb.id    = 5+hydra->N_classes+1;
+    copy_L2_to_L1_cb.ext   = (uint32_t) hydra->classf_bias;
+    copy_L2_to_L1_cb.loc   = (uint32_t) classf_bias;
+
+    #ifdef DETAILED_PROFILING
+    pi_perf_stop();
+    cycles_dma_copyin_s3 += pi_perf_read(PI_PERF_CYCLES);
+
+    pi_perf_reset();
+    pi_perf_start();
+    #endif
+
+    // Wait for step 1 transfers to be concluded, start step 2 transfers    
     pi_cl_dma_wait(&copy_L2_to_L1_inX);
     pi_cl_dma_wait(&copy_L2_to_L1_inX_diff);
     pi_cl_dma_wait(&copy_L2_to_L1_inW);
+    pi_cl_dma_memcpy(&(copy_L2_to_L1_cw[0]));
+    pi_cl_dma_memcpy(&copy_L2_to_L1_norm_avg);
+    pi_cl_dma_memcpy(&copy_L2_to_L1_norm_std);
 
+    #ifdef DETAILED_PROFILING
+    pi_perf_stop();
+    cycles_dma_wait_s1 += pi_perf_read(PI_PERF_CYCLES);
+
+    pi_perf_reset();
+    pi_perf_start();
+    #endif
+
+    // ******* - Perform Step 1 Calculations - ******* //
     for(int i=0; i < hydra->len_feat_vec; i++) {
         featVec[i] = 0;
     }
@@ -81,18 +178,132 @@ void hydra_forward_gap9(void *args) {
             }
         }
     }
+    
+    #ifdef DETAILED_PROFILING
+    pi_perf_stop();
+    cycles_compute_s1 += pi_perf_read(PI_PERF_CYCLES);
 
-    // Copy out feature vector from L1 into L2
-    pi_cl_dma_copy_t copy_L1_to_L2;
-    copy_L1_to_L2.dir   = PI_CL_DMA_DIR_LOC2EXT;
-    copy_L1_to_L2.merge = 0;
-    copy_L1_to_L2.size  = (uint16_t) 2*hydra->len_feat_vec;
-    copy_L1_to_L2.id    = 0;
-    copy_L1_to_L2.ext   = (uint32_t) hydra->featVec;
-    copy_L1_to_L2.loc   = (uint32_t) featVec;
+    // ******* - Perform Step 2 Calculations - ******* //
+    pi_perf_reset();
+    pi_perf_start();
+    #endif
 
-    pi_cl_dma_memcpy(&copy_L1_to_L2);
-    pi_cl_dma_wait(&copy_L1_to_L2);
+    pi_cl_dma_wait(&copy_L2_to_L1_norm_avg);
+    pi_cl_dma_wait(&copy_L2_to_L1_norm_std);
+    pi_cl_dma_wait(&(copy_L2_to_L1_cw[0]));
+    pi_cl_dma_memcpy(&(copy_L2_to_L1_cw[1]));
+    pi_cl_dma_memcpy(&(copy_L2_to_L1_cw[2]));
+    pi_cl_dma_memcpy(&(copy_L2_to_L1_cw[3]));
+
+    hydra->temp[0] = featMean[33];
+    hydra->temp[1] = featStd[325];
+
+    #ifdef DETAILED_PROFILING
+    pi_perf_stop();
+    cycles_dma_wait_s2 += pi_perf_read(PI_PERF_CYCLES);
+
+    pi_perf_reset();
+    pi_perf_start();
+    #endif
+
+    
+    #pragma omp parallel num_threads(8)
+    {
+        #pragma omp for
+        for(uint32_t f=0; f < hydra->len_feat_vec; f++) {
+
+            // Under-clip to zero, skip normalization if feature is zero
+            featVec[f] = (featVec[f] < 0 ? 0 : featVec[f]);
+            
+            if(featVec[f] > 0) {
+                featVec[f] = featVec[f] - featMean[f];
+
+                if(featVec[f] < 0) {
+                    // Most values are positive, but arithmetic shift of negative numbers 
+                    // is not equivalent to division by powers of two, since it does not round to zero.
+                    for(int s = 0; s < featStd[f]; s++) {
+                        featVec[f] = (featVec[f]) / 2;
+                    }
+                }
+                else {
+                    featVec[f] = (featVec[f]) >> featStd[f];
+                }
+            }
+        }
+    }
+
+    #ifdef DETAILED_PROFILING
+    pi_perf_stop();
+    cycles_compute_s2 += pi_perf_read(PI_PERF_CYCLES);
+
+    // ******* - Perform Step 3 Calculations - ******* //
+    pi_perf_reset();
+    pi_perf_start();
+    #endif
+
+    pi_cl_dma_wait(&(copy_L2_to_L1_cw[1]));
+    pi_cl_dma_wait(&(copy_L2_to_L1_cw[2]));
+    pi_cl_dma_wait(&(copy_L2_to_L1_cw[3]));
+    pi_cl_dma_memcpy(&(copy_L2_to_L1_cw[4]));
+    pi_cl_dma_memcpy(&(copy_L2_to_L1_cb));
+    
+    pi_cl_dma_wait(&copy_L2_to_L1_cb);
+    pi_cl_dma_wait(&(copy_L2_to_L1_cw[4]));
+    hydra->temp[2] = classf_bias[4];
+
+    #ifdef DETAILED_PROFILING    
+    pi_perf_stop();
+    cycles_dma_wait_s3 += pi_perf_read(PI_PERF_CYCLES);
+
+    pi_perf_reset();
+    pi_perf_start();
+    #endif
+
+    v4s v_featVec;
+    v4s v_classf_weights;
+
+    for(uint8_t c=0; c < hydra->N_classes; c++) {
+        classf_scores[c] = 0;
+    }
+
+    #pragma omp parallel num_threads(5)
+    {
+        #pragma omp for
+        for(uint8_t c=0; c < hydra->N_classes; c++) {
+            #if defined (VECTORIZE)
+            for(int f=0; f < hydra->len_feat_vec; f+=4) {
+            #else
+            for(int f=0; f < hydra->len_feat_vec; f+=1) {
+            #endif
+                #if defined (TARGET_GAP9) && defined (VECTORIZE)
+                v_featVec                  = __builtin_pulp_pack4(featVec[f], featVec[f+1], featVec[f+2], featVec[f+3]);
+                v_classf_weights           = *((v4s*) &classf_weights[c][f]);
+                classf_scores[c]  = __builtin_pulp_sdotsp4(v_featVec, v_classf_weights, classf_scores[c]);
+                #else
+                classf_scores[c] += featVec[f] * classf_weights[c][f];
+                #endif
+            }
+            classf_scores[c] += classf_bias[c];
+        }
+    }
+
+    #ifdef DETAILED_PROFILING
+    pi_perf_stop();
+    cycles_compute_s3 += pi_perf_read(PI_PERF_CYCLES);
+
+    // Copy-out scores. No need from DMA
+    pi_perf_reset();
+    pi_perf_start();
+    #endif
+
+    for(int c=0; c < hydra->N_classes; c++) {
+        hydra->classf_scores[c] = classf_scores[c];
+    }
+
+    #ifdef DETAILED_PROFILING
+    pi_perf_stop();
+    cycles_dma_copyout += pi_perf_read(PI_PERF_CYCLES);
+    #endif
 }
 #endif
 
@@ -310,25 +521,32 @@ int main()
             pmsis_exit(-1);
         }
 
-        hydra_reset(hydra);
+        //printf("[MASTER] featStd [3,4,5] = %d, %d, %d\n", hydra->featMean[33], hydra->featStd[325], hydra->classf_bias[4]);
+        pi_perf_reset();
         pi_perf_start();
         #ifdef PARALLELIZE
         pi_cluster_task(&cl_task, hydra_forward_gap9, hydra);
         pi_cluster_send_task_to_cl(&cluster_dev, &cl_task);
         pi_cluster_close(&cluster_dev);
         #else
+        hydra_reset(hydra);
         hydra_forward(hydra);
-        #endif
         hydra_sparse_scale(hydra);
         hydra_classifier(hydra);
+        #endif
+        #ifndef DETAILED_PROFILING
         pi_perf_stop();
+        //printf("[PARALLEL] featStd [3,4,5] = %d, %d, %d\n", hydra->temp[0], hydra->temp[1], hydra->temp[2]);
 
         /************* SECTION 4c: Collect benchmarks *************/
         cycles = pi_perf_read(PI_PERF_CYCLES);
-        cycles_million  += (float)(cycles-cycles_prev) / 1000000;
-        if(s % 20 == 0)
-            printf("Processed %6d samples. # Cycles: %ld\n", s, cycles-cycles_prev);
+        cycles_million  += (float)(cycles) / 1000000;
+        if(s % 20 == 0) {
+          //printf("Processed %6d samples. # Cycles: %ld\n", s, cycles-cycles_prev);
+            printf("Processed %6d samples. # Cycles: %ld\n", s, cycles);
+        }
         cycles_prev = cycles;
+        #endif
         /**********************************************************/
 
         /************* SECTION 4d: Dumping output data to file *************/
@@ -348,10 +566,40 @@ int main()
     pi_fs_close(fd[1]);
     pi_fs_unmount(&fs);
 
+    #ifndef DETAILED_PROFILING
     float avg_cycles = (float)cycles_million / NUM_SAMPLES;
     float avg_inf_time_ms = (avg_cycles  * 1e6) / 100e6 * 1e3;
-
     printf("Average inference time: %.3f ms. -- In raw perf cycles: ~= %.3f Million cycles\n", avg_inf_time_ms, avg_cycles);
+    #else
+    float avg_time_us[10];
+    avg_time_us[0] = ((float)cycles_dma_copyin_s1 / NUM_SAMPLES) / 100e6 * 1e6;
+    avg_time_us[1] = ((float)cycles_dma_copyin_s2 / NUM_SAMPLES) / 100e6 * 1e6;
+    avg_time_us[2] = ((float)cycles_dma_copyin_s3 / NUM_SAMPLES) / 100e6 * 1e6;
+    avg_time_us[3] = ((float)cycles_dma_wait_s1   / NUM_SAMPLES) / 100e6 * 1e6;
+    avg_time_us[4] = ((float)cycles_dma_wait_s2   / NUM_SAMPLES) / 100e6 * 1e6;
+    avg_time_us[5] = ((float)cycles_dma_wait_s3   / NUM_SAMPLES) / 100e6 * 1e6;
+    avg_time_us[6] = ((float)cycles_compute_s1    / NUM_SAMPLES) / 100e6 * 1e6;
+    avg_time_us[7] = ((float)cycles_compute_s2    / NUM_SAMPLES) / 100e6 * 1e6;
+    avg_time_us[8] = ((float)cycles_compute_s3    / NUM_SAMPLES) / 100e6 * 1e6;
+    avg_time_us[9] = ((float)cycles_dma_copyout   / NUM_SAMPLES) / 100e6 * 1e6;
+    
+    float avg_inf_time_us = 0;
+    for(int i=0; i < 10; i++) {
+        avg_inf_time_us += avg_time_us[i];
+    }
+    printf("Total Inference Time: %.6f us\n", avg_inf_time_us);
+
+    printf("DMA Copy-In Step 1: %04.6f us, (%03.2f %%)\n", avg_time_us[0], avg_time_us[0] / avg_inf_time_us * 100);
+    printf("DMA Copy-In Step 2: %04.6f us, (%03.2f %%)\n", avg_time_us[1], avg_time_us[1] / avg_inf_time_us * 100);
+    printf("DMA Copy-In Step 3: %04.6f us, (%03.2f %%)\n", avg_time_us[2], avg_time_us[2] / avg_inf_time_us * 100);
+    printf("DMA Wait Step 1:    %04.6f us, (%03.2f %%)\n", avg_time_us[3], avg_time_us[3] / avg_inf_time_us * 100);
+    printf("DMA Wait Step 2:    %04.6f us, (%03.2f %%)\n", avg_time_us[4], avg_time_us[4] / avg_inf_time_us * 100);
+    printf("DMA Wait Step 3:    %04.6f us, (%03.2f %%)\n", avg_time_us[5], avg_time_us[5] / avg_inf_time_us * 100);
+    printf("Compute  Step 1:    %04.6f us, (%03.2f %%)\n", avg_time_us[6], avg_time_us[6] / avg_inf_time_us * 100);
+    printf("Compute  Step 2:    %04.6f us, (%03.2f %%)\n", avg_time_us[7], avg_time_us[7] / avg_inf_time_us * 100);
+    printf("Compute  Step 3:    %04.6f us, (%03.2f %%)\n", avg_time_us[8], avg_time_us[8] / avg_inf_time_us * 100);
+    printf("DMA Copy-Out:       %04.6f us, (%03.2f %%)\n", avg_time_us[9], avg_time_us[9] / avg_inf_time_us * 100);
+    #endif
 
     return 0;
 }
