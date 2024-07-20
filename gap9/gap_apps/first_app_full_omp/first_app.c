@@ -13,8 +13,7 @@
 #define NUM_SAMPLES 50
 #define BUFFER_SZ   1500
 
-#define DETAILED_PROFILING 1
-
+//#define DETAILED_PROFILING 1
 
 #ifdef PARALLELIZE
 static PI_L1 RCKINT   inX[BUFFER_SZ], inX_diff[BUFFER_SZ], inW[BUFFER_SZ];
@@ -152,8 +151,12 @@ void hydra_forward_gap9(void *args) {
     #endif
 
     // ******* - Perform Step 1 Calculations - ******* //
-    for(int i=0; i < hydra->len_feat_vec; i++) {
-        featVec[i] = 0;
+    #pragma omp parallel num_threads(8)
+    {
+        #pragma omp for
+        for(int i=0; i < hydra->len_feat_vec; i+=1) {
+            featVec[i] = 0;
+        }
     }
 
     TeamForkArgs_T fork_args;
