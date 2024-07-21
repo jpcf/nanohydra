@@ -208,7 +208,6 @@ void hydra_forward_gap9(void *args) {
     pi_perf_reset();
     pi_perf_start();
     #endif
-
     
     #pragma omp parallel num_threads(8)
     {
@@ -266,7 +265,7 @@ void hydra_forward_gap9(void *args) {
     v4s v_classf_weights;
 
     for(uint8_t c=0; c < hydra->N_classes; c++) {
-        classf_scores[c] = 0;
+        classf_scores[c] = classf_bias[c];
     }
 
     #pragma omp parallel num_threads(5)
@@ -286,7 +285,7 @@ void hydra_forward_gap9(void *args) {
                 classf_scores[c] += featVec[f] * classf_weights[c][f];
                 #endif
             }
-            classf_scores[c] += classf_bias[c];
+            hydra->classf_scores[c] = classf_scores[c];
         }
     }
 
@@ -298,10 +297,6 @@ void hydra_forward_gap9(void *args) {
     pi_perf_reset();
     pi_perf_start();
     #endif
-
-    for(int c=0; c < hydra->N_classes; c++) {
-        hydra->classf_scores[c] = classf_scores[c];
-    }
 
     #ifdef DETAILED_PROFILING
     pi_perf_stop();
