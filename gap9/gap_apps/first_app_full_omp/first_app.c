@@ -10,7 +10,7 @@
 
 // Problem Defines
 #define INPUT_SZ  2
-#define NUM_SAMPLES 50
+#define NUM_SAMPLES 500
 #define BUFFER_SZ   1500
 
 //#define DETAILED_PROFILING 1
@@ -198,9 +198,6 @@ void hydra_forward_gap9(void *args) {
     pi_cl_dma_memcpy(&(copy_L2_to_L1_cw[2]));
     pi_cl_dma_memcpy(&(copy_L2_to_L1_cw[3]));
 
-    hydra->temp[0] = featMean[33];
-    hydra->temp[1] = featStd[325];
-
     #ifdef DETAILED_PROFILING
     pi_perf_stop();
     cycles_dma_wait_s2 += pi_perf_read(PI_PERF_CYCLES);
@@ -251,7 +248,6 @@ void hydra_forward_gap9(void *args) {
     
     pi_cl_dma_wait(&copy_L2_to_L1_cb);
     pi_cl_dma_wait(&(copy_L2_to_L1_cw[4]));
-    hydra->temp[2] = classf_bias[4];
 
     #ifdef DETAILED_PROFILING    
     pi_perf_stop();
@@ -292,15 +288,6 @@ void hydra_forward_gap9(void *args) {
     #ifdef DETAILED_PROFILING
     pi_perf_stop();
     cycles_compute_s3 += pi_perf_read(PI_PERF_CYCLES);
-
-    // Copy-out scores. No need from DMA
-    pi_perf_reset();
-    pi_perf_start();
-    #endif
-
-    #ifdef DETAILED_PROFILING
-    pi_perf_stop();
-    cycles_dma_copyout += pi_perf_read(PI_PERF_CYCLES);
     #endif
 }
 #endif
@@ -519,7 +506,6 @@ int main()
             pmsis_exit(-1);
         }
 
-        //printf("[MASTER] featStd [3,4,5] = %d, %d, %d\n", hydra->featMean[33], hydra->featStd[325], hydra->classf_bias[4]);
         pi_perf_reset();
         pi_perf_start();
         #ifdef PARALLELIZE
@@ -534,13 +520,11 @@ int main()
         #endif
         #ifndef DETAILED_PROFILING
         pi_perf_stop();
-        //printf("[PARALLEL] featStd [3,4,5] = %d, %d, %d\n", hydra->temp[0], hydra->temp[1], hydra->temp[2]);
 
         /************* SECTION 4c: Collect benchmarks *************/
         cycles = pi_perf_read(PI_PERF_CYCLES);
         cycles_million  += (float)(cycles) / 1000000;
-        if(s % 20 == 0) {
-          //printf("Processed %6d samples. # Cycles: %ld\n", s, cycles-cycles_prev);
+        if(s % 100 == 0) {
             printf("Processed %6d samples. # Cycles: %ld\n", s, cycles);
         }
         cycles_prev = cycles;

@@ -47,7 +47,6 @@ typedef struct Hydra {
     // Scaler Attributes
     int16_t *featMean;
     uint8_t *featStd;
-    int8_t temp[6];
 
 } Hydra;
 

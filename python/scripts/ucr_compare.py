@@ -7,7 +7,7 @@ import warnings
 import os
 import pickle
 
-CSV_PATH = "./data/results_ours.csv"
+CSV_PATH = "./data/results_ours_q16_k8_g64.csv"
 UCR_DATA_SET_FACTS = "./data/ucr_props.bin"
 
 if __name__ == "__main__":

@@ -40,8 +40,8 @@ class NanoHydraCfg():
             # Alternative 1: SGD Classifier
             self.classf = SGDClassifier(
                 loss='log_loss', 
-                alpha=0.0001, 
-                penalty='l1', 
+                alpha=0.01, 
+                penalty='l2', 
                 class_weight="balanced", 
                 shuffle=True, 
                 n_jobs=22, 
@@ -170,8 +170,8 @@ class NanoHydra():
         self.complexity_mmacs['transform']  = self.input_length * self.num_channels * self.h * self.k * self.num_dilations * self.num_diffs * self.__KERNEL_LEN / 1e6
 
         # Size of classifier. Assumer weights will be quantized to 8bits
-        self.size['classifier']             = len_feat_vec * 12 / (2**10)
-        self.complexity_mmacs['classifier'] = len_feat_vec * 12 / 1e6
+        self.size['classifier']             = len_feat_vec * (5+3) / (2**10)
+        self.complexity_mmacs['classifier'] = len_feat_vec * 5 / 1e6
         #self.size['classifier']             = self.cfg.get_classf().coef_.size / (2**10)
         #self.complexity_mmacs['classifier'] = self.cfg.get_classf().coef_.size
 

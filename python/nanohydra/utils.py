@@ -133,3 +133,38 @@ def augment_data_of_class(X, Xbackground, factor, add_noise=True):
     assert itercnt == LEN_AUG_SAMPLES, f"Not all augmented data positions were calculated ({itercnt} vs {LEN_AUG_SAMPLES})"
 
     return Xaug
+
+def augment_data_of_class_ecg(X, factor):
+    # Fixed params
+    FS = 140
+
+    # Variable Params
+    MAX_SHIFT     = 0.0
+    MAX_NOISE_STD = 0.005
+
+    # Calculable params
+    LEN_CLASS_SAMPLES = len(X)
+    LEN_AUG_SAMPLES   = LEN_CLASS_SAMPLES*(factor)
+
+    # Pre-allocate space for augmented samples
+    Xaug = np.empty((LEN_AUG_SAMPLES, 1, FS))
+
+    itercnt = 0
+    for idx in tqdm(range(LEN_CLASS_SAMPLES)):
+        for f in range(factor):
+            #shift = int(np.random.uniform(-MAX_SHIFT, MAX_SHIFT) * (FS))
+            #if(shift < 0):
+            #    Xshift = np.concatenate([np.zeros(-shift), X[idx,0,-shift:]])
+            #elif(shift > 0):
+            #    Xshift = np.concatenate([X[idx,0,:-shift], np.zeros(shift)])
+            #else:
+            Xshift = X[idx,0,:]
+
+            assert Xshift.shape[0] == X.shape[2], f"The shifted vector has an incorrect number of samples"
+            Xaug[idx*(factor-1) + f,:] = Xshift + np.random.normal(0, MAX_NOISE_STD, size=Xshift.shape)
+            
+            itercnt += 1
+    
+    assert itercnt == LEN_AUG_SAMPLES, f"Not all augmented data positions were calculated ({itercnt} vs {LEN_AUG_SAMPLES})"
+
+    return Xaug

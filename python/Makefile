@@ -27,7 +27,7 @@ test:
 	$(PYTHONPATH) test.py 10000
 
 test_quant: 
-	$(PYTHONPATH) test_quant.py all
+	$(PYTHONPATH) test_quant.py idowjiadj
 
 run_ucr_benchmark: 
 	$(PYTHONPATH) run_ucr_benchmark.py all
@@ -35,6 +35,8 @@ run_ucr_benchmark:
 analyze_ucr_benchmark: 
 	$(PYTHONPATH) scripts/ucr_compare.py
 
+gen_results: 
+	$(PYTHONPATH) scripts/gen_results.py
 # Used in 29th Oct for profiling the first naive numpy port
 profile_hydra:
 	$(PYTHONPATH)  profile_hydra.py
